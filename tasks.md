@@ -14,12 +14,12 @@
 
 ## T-001 — Inicializar monorepo
 
-- [ ] Crear estructura `backend/`, `frontend/`, `config/`, `examples/`, `docs/` y `scripts/`.
-- [ ] Agregar `.gitignore`, `.editorconfig` y `.env.example`.
-- [ ] Crear README inicial con estado del proyecto.
-- [ ] Verificar que no se versionan secretos.
+- [x] Crear estructura `backend/`, `frontend/`, `config/`, `examples/`, `docs/` y `scripts/`.
+- [x] Agregar `.gitignore`, `.editorconfig` y `.env.example`.
+- [x] Crear README inicial con estado del proyecto.
+- [x] Verificar que no se versionan secretos.
 
-**Terminado cuando:** la estructura existe, Git está limpio y los archivos de gobierno están en la raíz.
+**Terminado cuando:** la estructura existe, Git está limpio y los archivos de gobierno están en la raíz. [x]
 
 ## T-002 — Registrar decisiones iniciales
 
@@ -33,19 +33,19 @@
 
 ## T-003 — Definir versiones y lockfiles
 
-- [ ] Elegir Python 3.12.
-- [ ] Elegir versiones vigentes de FastAPI, LangGraph, Pydantic, SQLAlchemy y Alembic.
-- [ ] Elegir React 19.x, TypeScript y Vite.
-- [ ] Configurar lockfiles.
-- [ ] Documentar cualquier dependencia multi-proveedor.
-- [ ] Agregar herramienta de auditoría de dependencias.
+- [x] Elegir Python 3.12.
+- [x] Elegir versiones vigentes de FastAPI, LangGraph, Pydantic, SQLAlchemy y Alembic.
+- [x] Elegir React 19.x, TypeScript y Vite.
+- [x] Configurar lockfiles.
+- [x] Documentar cualquier dependencia multi-proveedor.
+- [x] Agregar herramienta de auditoría de dependencias.
 
-**Terminado cuando:** instalaciones reproducibles funcionan en una máquina limpia o contenedor.
+**Terminado cuando:** instalaciones reproducibles funcionan en una máquina limpia o contenedor. [x]
 
 ### Milestone M0
 
-- [ ] Proyecto inicial reproducible.
-- [ ] Decisiones principales documentadas.
+- [x] Proyecto inicial reproducible.
+- [x] Decisiones principales documentadas.
 
 ---
 
