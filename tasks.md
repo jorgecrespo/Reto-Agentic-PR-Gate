@@ -641,7 +641,7 @@
 - [x] orden.
 - [x] cálculo.
 - [x] validaciones.
-- [x] fixtures.
+- [x] datos de prueba.
 - [x] tests.
 
 ## T-111 — Crear cambio defectuoso
@@ -680,13 +680,11 @@
 
 ### Milestone M11
 
-- [ ] Existen tres escenarios reproducibles.
+- [ ] Existen tres PRs de demostración reproducibles.
 
-**Bloqueo operativo:** `scripts/demo.sh` verificó localmente el fallo funcional del
-baseline, el candidate y el cambio seguro. Los estados `READY` e `INCONCLUSIVE`
-no se han emitido aún por una ejecución integrada del gate; el tercero es un
-fixture declarativo de validación obligatoria ausente. Por ello el milestone no se
-marca como terminado.
+**Bloqueo operativo:** faltan URLs reales de PR para cerrar la evidencia de los
+tres casos de demostración. El flujo local alternativo fue eliminado para evitar
+ambigüedad; el milestone sigue abierto hasta contar con PRs accesibles de GitHub.
 
 ---
 

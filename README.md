@@ -9,10 +9,9 @@ determinística aportan evidencia y emiten `READY`, `CONDITIONAL`, `BLOCKED` o
 
 El flujo implementado valida URLs, consulta GitHub en modo lectura, construye
 contexto acotado, valida salidas LLM, aplica límites al parche y persiste
-resultados. La demo de e-commerce incluida es **local y basada en fixtures**:
-no afirma que exista ni consulta un PR real de GitHub. La validación completa de
-un PR real y las métricas de diez ejecuciones requieren Docker, credenciales y
-una ejecución posterior documentada.
+resultados. El ejemplo de e-commerce en `examples/demo_ecommerce/` sirve como
+base de código para PRs de GitHub; la única forma de probar el prototipo es con
+una URL de PR de GitHub.
 
 ## Requisitos
 
@@ -57,25 +56,6 @@ No se afirma aquí que una imagen se haya construido o que Docker esté disponib
 ejecute `docker compose config` y `./scripts/run.sh` en el entorno destino antes
 de considerar esta vía operativa.
 
-## Demo reproducible local
-
-```bash
-./scripts/demo.sh
-```
-
-El script verifica tres escenarios con fixtures locales:
-
-| Escenario | Evidencia ejecutada | Resultado esperado |
-| --- | --- | --- |
-| Defectuoso | El test de regresión falla por cobrar el precio del request | `BLOCKED` antes de mitigar |
-| Candidate | El test y la suite pasan con precio de catálogo | Corrección validada |
-| Seguro | La suite del cambio pequeño pasa | `READY` cuando el gate recibe controles completos |
-| Inconcluso | Runner obligatorio declarado no disponible | `INCONCLUSIVE` |
-
-El estado del último caso es una representación de política, no una ejecución de
-Docker. Consulte `examples/demo_ecommerce/README.md` y
-`scripts/create_demo_prs.md` para recrear ramas/PRs manualmente en un fork.
-
 ## Controles
 
 ```bash
@@ -84,7 +64,7 @@ Docker. Consulte `examples/demo_ecommerce/README.md` y
 
 Incluye formato, lint, tipos y tests backend; lint, tipos, tests y build frontend.
 Los tests de integración Docker se omiten automáticamente si el daemon no está
-operativo. Ejecute además `./scripts/demo.sh` para la evidencia local de la demo.
+operativo.
 
 ## Configuración y proveedores
 
@@ -112,5 +92,5 @@ compatibilidad de otros proveedores sin un adaptador y contract tests.
 - `docs/security.md`: modelo de amenazas y retención.
 - `docs/providers.md`: contrato y alta de proveedores.
 - `docs/limitations.md`: límites y bloqueos operativos actuales.
-- `docs/demo.md`: escenarios, evidencia y ramas opcionales.
+- `scripts/create_demo_prs.md`: guía para recrear PRs de demostración en un fork.
 - `docs/challenge-decision-document.md`: documento de entrega y uso transparente de IA.

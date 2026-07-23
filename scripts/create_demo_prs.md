@@ -1,6 +1,5 @@
 # Recreate GitHub demo PRs
 
-The checked-in demo uses local fixtures and does not publish branches or PRs.
 Use these instructions only in a disposable fork when a live GitHub walkthrough is
 required. Replace placeholders; do not treat the URLs as existing PRs.
 
@@ -12,10 +11,12 @@ required. Replace placeholders; do not treat the URLs as existing PRs.
 
 1. Create a branch from the same base SHA used for the walkthrough.
 2. For the defective branch, copy the change represented by
-   `examples/demo_ecommerce/scenarios/defective/app/orders.py`. Its PR body should
-   state: `The order total must use the current catalog price, not request unit_price.`
+   `examples/demo_ecommerce/app/orders.py` so the order total uses the request
+   price instead of the catalog price. Its PR body should state: `The order total
+   must use the current catalog price, not request unit_price.`
 3. For the safe branch, add the optional `description` field represented by
-   `examples/demo_ecommerce/scenarios/safe/app/domain.py` and its test.
+   `examples/demo_ecommerce/app/domain.py` and update the relevant test in
+   `examples/demo_ecommerce/tests/test_orders.py`.
 4. For the inconclusive case, use an otherwise valid change but select a validation
    environment where Docker is intentionally unavailable. Do not claim a successful
    validation.

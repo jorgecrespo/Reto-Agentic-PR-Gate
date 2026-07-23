@@ -1,16 +1,10 @@
-# Demo e-commerce local
+# Demo e-commerce
 
-Los escenarios son fixtures locales para demostrar el flujo sin afirmar que se
-consultaron PRs reales de GitHub.
+Este ejemplo contiene el código de e-commerce usado como base para PRs de GitHub.
+El prototipo se prueba mediante URLs de pull request, no con una emulación local.
 
-- `scenarios/defective`: baseline con el defecto intencional. Su test de regresión
-  falla porque cobra `unit_price` del request.
-- `scenarios/candidate`: corrección esperada. Obtiene el precio de catálogo y su
-  suite pasa.
-- `scenarios/safe`: cambio seguro pequeño, `description` opcional para productos.
-- `scenarios/inconclusive.json`: validación obligatoria no disponible; por política
-  el resultado esperado es `INCONCLUSIVE`, nunca `READY`.
+- `app/`: dominio y lógica de órdenes del ejemplo.
+- `tests/`: pruebas unitarias y de regresión del ejemplo.
 
-Ejecutar `./scripts/demo.sh` desde la raíz. El script verifica códigos de salida
-reales de pytest para los tres escenarios que ejecutan código y presenta el caso
-inconcluso como fixture declarativo.
+Para reproducir un caso de demostración, cree un PR real en un fork y analícelo
+con su URL de GitHub.

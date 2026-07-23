@@ -5,8 +5,8 @@
 Agentic PR Gate busca hacer trazable la decisión de avanzar un PR a QA. Separa la
 hipótesis del modelo de la evidencia: el modelo puede señalar el uso inseguro de
 un precio enviado por el cliente y proponer un parche; tests, runner y política
-determinan el estado final. La demo local ilustra los tres resultados relevantes:
-defecto bloqueante, cambio seguro y control obligatorio no ejecutado.
+determinan el estado final. La evidencia reproducible debe venir de PRs de GitHub
+accesibles, no de una emulación local alternativa.
 
 ## Arquitectura
 
@@ -25,8 +25,8 @@ puro y testeable: no depende de FastAPI, SQLite, GitHub ni LLM.
   multiusuario quedan fuera de alcance.
 - Runner Docker con argv allowlisted y sin red: es preferible a ejecutar código
   del PR localmente.
-- Fixtures locales de demo: permiten una prueba reproducible sin inventar URLs ni
-  depender de servicios externos.
+- PRs de demostración en un fork: permiten una prueba reproducible usando URLs
+  reales sin inventar accesos ni depender de emulación local.
 
 ## Costo, latencia, privacidad y operación
 
@@ -38,16 +38,17 @@ usuarios no root y healthchecks, pendientes de validación en un daemon real.
 
 ## Resultados, límites y siguientes pasos
 
-La evidencia local valida fail-before/pass-after del precio y suites seguras. No
-demuestra una corrida GitHub/LLM/Docker completa, diez ejecuciones ni métricas.
-Siguientes pasos: completar el flujo de runner integrado, ejecutar los controles
-de seguridad Docker, registrar diez corridas controladas y añadir un segundo
-adaptador LLM con contract tests.
+La evidencia de prueba valida fail-before/pass-after del precio y suites seguras.
+No demuestra una corrida GitHub/LLM/Docker completa, diez ejecuciones ni
+métricas. Siguientes pasos: completar el flujo de runner integrado, ejecutar los
+controles de seguridad Docker, registrar diez corridas controladas y añadir un
+segundo adaptador LLM con contract tests.
 
 ## Uso transparente de IA
 
 Se usó IA asistiva para acelerar implementación y documentación. Las decisiones
 de arquitectura, el alcance y la revisión de cambios corresponden al candidato.
-Los outputs del modelo se validan con Pydantic y no deciden el gate; los resultados
-que se afirman en la demo proceden de pytest local. No se persiste razonamiento
-interno del modelo. Las limitaciones indicadas arriba continúan abiertas.
+Los outputs del modelo se validan con Pydantic y no deciden el gate; los
+resultados que se afirman aquí proceden de pytest local sobre los ejemplos. No se
+persiste razonamiento interno del modelo. Las limitaciones indicadas arriba
+continúan abiertas.

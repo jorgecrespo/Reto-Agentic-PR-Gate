@@ -119,12 +119,10 @@ Persona = autoridad final
 ├── docs/
 │   ├── architecture.md
 │   ├── security.md
-│   ├── demo.md
 │   ├── decisions/
 │   └── challenge-decision-document.md
 └── scripts/
-    ├── create_demo_prs.md
-    └── run_demo.sh
+    └── create_demo_prs.md
 ```
 
 ---

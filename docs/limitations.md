@@ -10,9 +10,8 @@
   concurrencia ni validación de locks bajo carga demostrada.
 - La salida LLM no es determinista. El gate es determinista únicamente respecto
   de los facts recolectados.
-- La demo versionada usa fixtures locales. El runner Docker y el stack Compose
-  fueron verificados localmente, pero la demo no demuestra conectividad GitHub
-  ni un proveedor LLM real.
+- No existe un modo local alternativo. La evidencia válida proviene de análisis
+  de PRs de GitHub y de validaciones determinísticas.
 - No se han ejecutado diez análisis controlados ni se reportan métricas de
   detección, latencia, tokens, costo o falsos positivos. Esas métricas permanecen
   pendientes y no deben presentarse como resultados.
