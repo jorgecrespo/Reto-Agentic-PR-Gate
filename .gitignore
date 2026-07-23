@@ -13,3 +13,4 @@ frontend/dist/
 *.tsbuildinfo
 data/
 workspaces/
+backend/tests/.test-pr-gate.db

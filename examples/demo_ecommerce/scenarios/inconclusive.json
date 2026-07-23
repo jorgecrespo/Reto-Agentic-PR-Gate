@@ -1,0 +1,6 @@
+{
+  "scenario": "inconclusive",
+  "expected_status": "INCONCLUSIVE",
+  "reason": "The mandatory sandbox validation is deliberately unavailable in this local fixture.",
+  "not_executed_controls": ["baseline_regression", "candidate_suite", "lint"]
+}

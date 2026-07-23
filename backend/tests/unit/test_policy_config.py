@@ -33,3 +33,16 @@ rules:
 """)
     with pytest.raises(ValueError):
         load_policy(path)
+
+
+def test_rejects_invalid_policy_status(tmp_path: Path) -> None:
+    path = tmp_path / "policy.yaml"
+    path.write_text("""version: '1.0.0'
+target_stage: QA
+rules:
+  - id: GATE-001
+    description: x
+    failure_status: INVALID
+""")
+    with pytest.raises(ValueError):
+        load_policy(path)

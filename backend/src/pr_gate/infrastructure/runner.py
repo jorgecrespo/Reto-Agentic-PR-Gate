@@ -14,6 +14,7 @@ class CommandResult:
     stderr: str
     timed_out: bool
     infrastructure_error: bool
+    classification: str = "UNKNOWN"
 
 
 class DockerRunner:
@@ -26,6 +27,16 @@ class DockerRunner:
     async def run(
         self, workspace: Path, command_name: str, command: tuple[str, ...]
     ) -> CommandResult:
+        if not command or any(not value or "\x00" in value for value in command):
+            return CommandResult(
+                command_name,
+                None,
+                "",
+                "Comando administrado inválido.",
+                False,
+                True,
+                "INFRASTRUCTURE_ERROR",
+            )
         if shutil.which("docker") is None:
             return CommandResult(command_name, None, "", "Docker no está disponible.", False, True)
         docker_command = (
@@ -63,11 +74,13 @@ class DockerRunner:
             process.kill()
             await process.wait()
             return CommandResult(
-                command_name, None, "", "El comando excedió el timeout.", True, False
+                command_name, None, "", "El comando excedió el timeout.", True, False, "TIMEOUT"
             )
         decoded_stdout = stdout.decode()[:8000]
         decoded_stderr = stderr.decode()[:8000]
-        infrastructure_error = process.returncode == 125 and "docker API" in decoded_stderr
+        infrastructure_error = (
+            process.returncode in {125, 126, 127} and "docker" in decoded_stderr.lower()
+        )
         return CommandResult(
             command_name,
             process.returncode,
@@ -75,4 +88,26 @@ class DockerRunner:
             decoded_stderr,
             False,
             infrastructure_error,
+            classify_command_result(
+                process.returncode, decoded_stdout, decoded_stderr, infrastructure_error
+            ),
         )
+
+
+def classify_command_result(
+    exit_code: int | None, stdout: str, stderr: str, infrastructure_error: bool = False
+) -> str:
+    text = f"{stdout}\n{stderr}".lower()
+    if infrastructure_error:
+        return "INFRASTRUCTURE_ERROR"
+    if exit_code == 0:
+        return "PASSED"
+    if "assertionerror" in text or "failed" in text and "error" not in text:
+        return "ASSERTION_FAILURE"
+    if "syntaxerror" in text:
+        return "SYNTAX_ERROR"
+    if "importerror" in text or "modulenotfounderror" in text:
+        return "IMPORT_ERROR"
+    if "no module named" in text or "not found" in text:
+        return "DEPENDENCY_ERROR"
+    return "FAILED"

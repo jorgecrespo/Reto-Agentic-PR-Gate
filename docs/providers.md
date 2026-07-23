@@ -1,7 +1,14 @@
-# Adding a model provider
+# Proveedores LLM
 
-Model profiles belong in `config/models.example.yaml`; credentials are referenced only by environment-variable name and are never returned by the API.
+Los perfiles están en `config/models.example.yaml`. Solo se versiona el nombre de
+la variable de entorno, nunca una credencial. La API devuelve metadatos seguros
+del perfil y omite `api_key_env`.
 
-Implement a gateway adapter that returns the Pydantic `AnalysisOutput` and `FixOutput` contracts from `pr_gate.application.models`. The adapter must use timeouts, bounded retries, structured JSON validation, and must not expose provider errors or credentials to the frontend.
+Un adaptador debe implementar el contrato propio y devolver `AnalysisOutput` y
+`FixOutput` Pydantic de `pr_gate.application.models`. Debe usar timeout, reintentos
+acotados, JSON estructurado validado y errores resumidos sin claves, prompts ni
+contenido sensible. Añada contract tests con fake antes de habilitarlo.
 
-The included adapter is `OpenAILLMGateway` using `gpt-4.1-mini`. Add contract tests with a fake before enabling another provider.
+El perfil actual usa `OpenAILLMGateway` y `gpt-4.1-mini`. No se declara soporte
+real de un segundo proveedor: hacerlo requiere adaptador, perfil documentado,
+test seguro sin credenciales y una ejecución manual con credenciales autorizadas.

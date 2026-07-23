@@ -1,16 +1,13 @@
 from __future__ import annotations
 
 import asyncio
-import os
 import shutil
 import tempfile
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
-import httpx
-
-from pr_gate.infrastructure.github import PullRequestSnapshot
+from pr_gate.infrastructure.github import GitHubClient, GitHubError, PullRequestSnapshot
 
 
 class WorkspaceError(RuntimeError):
@@ -25,30 +22,23 @@ class Workspaces:
 
 
 class WorkspaceManager:
+    def __init__(
+        self, github: GitHubClient | None = None, max_archive_bytes: int = 100_000_000
+    ) -> None:
+        self._github = github or GitHubClient()
+        self._max_archive_bytes = max_archive_bytes
+
     async def prepare(self, snapshot: PullRequestSnapshot) -> Workspaces:
         root = Path(tempfile.mkdtemp(prefix="pr-gate-"))
         archive_path = root / "source.zip"
         try:
-            async with httpx.AsyncClient(timeout=60) as client:
-                response = await client.get(
-                    f"https://api.github.com/repos/{snapshot.ref.owner}/{snapshot.ref.repository}/zipball/{snapshot.head_sha}",
-                    headers={
-                        "Accept": "application/vnd.github+json",
-                        **(
-                            {"Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}"}
-                            if os.environ.get("GITHUB_TOKEN")
-                            else {}
-                        ),
-                    },
-                )
-                response.raise_for_status()
-                archive_path.write_bytes(response.content)
+            await self._github.download_archive(snapshot, archive_path, self._max_archive_bytes)
             extracted = self._extract_archive(archive_path, root / "extract")
             baseline, candidate = root / "baseline", root / "candidate"
             shutil.copytree(extracted, baseline)
             shutil.copytree(extracted, candidate)
             return Workspaces(root=root, baseline=baseline, candidate=candidate)
-        except (httpx.HTTPError, OSError, zipfile.BadZipFile) as error:
+        except (GitHubError, OSError, zipfile.BadZipFile) as error:
             shutil.rmtree(root, ignore_errors=True)
             raise WorkspaceError("No fue posible preparar el snapshot del PR.") from error
 
@@ -56,10 +46,14 @@ class WorkspaceManager:
     def _extract_archive(archive_path: Path, target: Path) -> Path:
         target.mkdir()
         with zipfile.ZipFile(archive_path) as archive:
+            if sum(member.file_size for member in archive.infolist()) > 250_000_000:
+                raise WorkspaceError("El archive excede el límite descomprimido.")
             for member in archive.infolist():
                 destination = (target / member.filename).resolve()
                 if not destination.is_relative_to(target.resolve()):
                     raise WorkspaceError("El archive contiene una ruta insegura.")
+                if member.is_dir():
+                    continue
                 archive.extract(member, target)
         directories = [path for path in target.iterdir() if path.is_dir()]
         if len(directories) != 1:

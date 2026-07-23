@@ -97,59 +97,59 @@
 
 ## T-020 — Modelar dominio
 
-- [ ] Crear enums de severidad, validación y decisión.
-- [ ] Crear entidades inmutables donde corresponda.
-- [ ] Crear value objects para URL, SHA y versión.
-- [ ] Agregar validaciones.
+- [x] Crear enums de severidad, validación y decisión.
+- [x] Crear entidades inmutables donde corresponda.
+- [x] Crear value objects para URL, SHA y versión.
+- [x] Agregar validaciones.
 
 **Tests:** casos válidos e inválidos.
 
 ## T-021 — Implementar parser de URL de GitHub PR
 
-- [ ] Aceptar solo formato esperado.
-- [ ] Extraer owner, repo y number.
-- [ ] Rechazar hosts y paths inválidos.
-- [ ] Normalizar URL.
+- [x] Aceptar solo formato esperado.
+- [x] Extraer owner, repo y number.
+- [x] Rechazar hosts y paths inválidos.
+- [x] Normalizar URL.
 
 **Tests:** públicos, privados, URL con query, URL inválida y path traversal.
 
 ## T-022 — Diseñar facts del gate
 
-- [ ] Crear `GateFacts`.
-- [ ] Crear `GateRuleResult`.
-- [ ] Crear `GateDecision`.
-- [ ] Definir `PASS`, `FAIL`, `UNKNOWN`.
+- [x] Crear `GateFacts`.
+- [x] Crear `GateRuleResult`.
+- [x] Crear `GateDecision`.
+- [x] Definir `PASS`, `FAIL`, `UNKNOWN`.
 
 ## T-023 — Implementar política determinística v1
 
-- [ ] Implementar reglas GATE-001 a GATE-015.
-- [ ] Implementar precedencia.
-- [ ] Devolver evidence IDs.
-- [ ] Devolver acciones requeridas.
-- [ ] No importar LLM ni infraestructura.
+- [x] Implementar reglas GATE-001 a GATE-015.
+- [x] Implementar precedencia.
+- [x] Devolver evidence IDs.
+- [x] Devolver acciones requeridas.
+- [x] No importar LLM ni infraestructura.
 
 **Tests obligatorios:**
 
-- [ ] READY.
-- [ ] CONDITIONAL.
-- [ ] BLOCKED.
-- [ ] INCONCLUSIVE.
-- [ ] tests no ejecutados nunca produce READY.
-- [ ] hallazgo crítico produce BLOCKED.
-- [ ] criterio obligatorio unknown produce INCONCLUSIVE.
-- [ ] secreto produce BLOCKED.
+- [x] READY.
+- [x] CONDITIONAL.
+- [x] BLOCKED.
+- [x] INCONCLUSIVE.
+- [x] tests no ejecutados nunca produce READY.
+- [x] hallazgo crítico produce BLOCKED.
+- [x] criterio obligatorio unknown produce INCONCLUSIVE.
+- [x] secreto produce BLOCKED.
 
 ## T-024 — Cargar política YAML
 
-- [ ] Definir schema.
-- [ ] Validar IDs únicos.
-- [ ] Calcular checksum y versión.
-- [ ] Fallar al iniciar si la política es inválida.
+- [x] Definir schema.
+- [x] Validar IDs únicos.
+- [x] Calcular checksum y versión.
+- [x] Fallar al iniciar si la política es inválida.
 
 ### Milestone M2
 
-- [ ] El gate funciona sin LLM, GitHub ni DB.
-- [ ] Cobertura alta sobre reglas críticas.
+- [x] El gate funciona sin LLM, GitHub ni DB.
+- [x] Cobertura alta sobre reglas críticas.
 
 ---
 
@@ -157,43 +157,43 @@
 
 ## T-030 — Configurar SQLAlchemy y Alembic
 
-- [ ] Crear engine SQLite.
-- [ ] Activar foreign keys.
-- [ ] Crear session management.
-- [ ] Crear migración inicial.
+- [x] Crear engine SQLite.
+- [x] Activar foreign keys.
+- [x] Crear session management.
+- [x] Crear migración inicial.
 
 ## T-031 — Crear tablas
 
-- [ ] `pull_requests`.
-- [ ] `pr_snapshots`.
-- [ ] `analysis_runs`.
-- [ ] `findings`.
-- [ ] `candidate_fixes`.
-- [ ] `validation_runs`.
-- [ ] `acceptance_evaluations`.
-- [ ] `gate_decisions`.
-- [ ] `run_events`.
+- [x] `pull_requests`.
+- [x] `pr_snapshots`.
+- [x] `analysis_runs`.
+- [x] `findings`.
+- [x] `candidate_fixes`.
+- [x] `validation_runs`.
+- [x] `acceptance_evaluations`.
+- [x] `gate_decisions`.
+- [x] `run_events`.
 
 ## T-032 — Implementar repositorios
 
-- [ ] Crear interfaces.
-- [ ] Crear adaptadores SQLAlchemy.
-- [ ] Implementar creación de análisis.
-- [ ] Implementar guardado incremental.
-- [ ] Implementar informe agregado.
-- [ ] Implementar historial paginado.
+- [x] Crear interfaces.
+- [x] Crear adaptadores SQLAlchemy.
+- [x] Implementar creación de análisis.
+- [x] Implementar guardado incremental.
+- [x] Implementar informe agregado.
+- [x] Implementar historial paginado.
 
 ## T-033 — Probar persistencia
 
-- [ ] Migración desde cero.
-- [ ] CRUD de análisis.
-- [ ] rollback ante error.
-- [ ] historial tras recrear aplicación.
-- [ ] no persistencia de secretos.
+- [x] Migración desde cero.
+- [x] CRUD de análisis.
+- [x] rollback ante error.
+- [x] historial tras recrear aplicación.
+- [x] no persistencia de secretos.
 
 ### Milestone M3
 
-- [ ] Informe completo puede persistirse y recuperarse.
+- [x] Informe completo puede persistirse y recuperarse.
 
 ---
 
@@ -201,54 +201,54 @@
 
 ## T-040 — Crear estado del grafo
 
-- [ ] Definir `AnalysisState`.
-- [ ] Usar estructuras serializables.
-- [ ] Definir errores tipados.
-- [ ] Definir eventos acumulables.
+- [x] Definir `AnalysisState`.
+- [x] Usar estructuras serializables.
+- [x] Definir errores tipados.
+- [x] Definir eventos acumulables.
 
 ## T-041 — Crear puertos y fakes
 
-- [ ] `PullRequestProvider`.
-- [ ] `LLMGateway`.
-- [ ] `SandboxRunner`.
-- [ ] `AnalysisRepository`.
-- [ ] `EventPublisher`.
-- [ ] Implementaciones fake determinísticas.
+- [x] `PullRequestProvider`.
+- [x] `LLMGateway`.
+- [x] `SandboxRunner`.
+- [x] `AnalysisRepository`.
+- [x] `EventPublisher`.
+- [x] Implementaciones fake determinísticas.
 
 ## T-042 — Crear nodos mínimos
 
-- [ ] `validate_request`.
-- [ ] `fetch_pull_request`.
-- [ ] `analyze_change`.
-- [ ] `generate_candidate_fix`.
-- [ ] `run_baseline_regression`.
-- [ ] `run_candidate_validation`.
-- [ ] `apply_quality_gate`.
-- [ ] `persist_report`.
-- [ ] `finalize`.
+- [x] `validate_request`.
+- [x] `fetch_pull_request`.
+- [x] `analyze_change`.
+- [x] `generate_candidate_fix`.
+- [x] `run_baseline_regression`.
+- [x] `run_candidate_validation`.
+- [x] `apply_quality_gate`.
+- [x] `persist_report`.
+- [x] `finalize`.
 
 ## T-043 — Construir grafo y routing
 
-- [ ] Camino exitoso.
-- [ ] Entrada inválida.
-- [ ] GitHub inaccesible.
-- [ ] No finding.
-- [ ] Patch inválido.
-- [ ] Infraestructura fallida.
-- [ ] Limpieza final.
+- [x] Camino exitoso.
+- [x] Entrada inválida.
+- [x] GitHub inaccesible.
+- [x] No finding.
+- [x] Patch inválido.
+- [x] Infraestructura fallida.
+- [x] Limpieza final.
 
 ## T-044 — Probar grafo
 
-- [ ] Caso READY fake.
-- [ ] Caso BLOCKED fake.
-- [ ] Caso INCONCLUSIVE fake.
-- [ ] Eventos en orden.
-- [ ] Persistencia final.
-- [ ] Nodos unitarios.
+- [x] Caso READY fake.
+- [x] Caso BLOCKED fake.
+- [x] Caso INCONCLUSIVE fake.
+- [x] Eventos en orden.
+- [x] Persistencia final.
+- [x] Nodos unitarios.
 
 ### Milestone M4
 
-- [ ] Un análisis fake recorre backend completo y queda persistido.
+- [x] Un análisis fake recorre backend completo y queda persistido.
 
 ---
 
@@ -256,85 +256,85 @@
 
 ## T-050 — Crear API de configuración
 
-- [ ] `GET /config/models`.
-- [ ] `GET /config/validation-profiles`.
-- [ ] `GET /config/policy`.
-- [ ] No exponer variables secretas.
+ - [x] `GET /config/models`.
+ - [x] `GET /config/validation-profiles`.
+ - [x] `GET /config/policy`.
+ - [x] No exponer variables secretas.
 
 ## T-051 — Crear API de análisis
 
-- [ ] `POST /analyses`.
-- [ ] `GET /analyses`.
-- [ ] `GET /analyses/{id}`.
-- [ ] errores RFC 7807 o formato consistente.
-- [ ] respuesta `202 Accepted`.
+ - [x] `POST /analyses`.
+ - [x] `GET /analyses`.
+ - [x] `GET /analyses/{id}`.
+ - [x] errores RFC 7807 o formato consistente.
+ - [x] respuesta `202 Accepted`.
 
 ## T-052 — Gestionar ejecución en background
 
-- [ ] Crear servicio de ejecución.
-- [ ] Detectar runs huérfanos al iniciar.
-- [ ] Evitar duplicados accidentales.
-- [ ] Propagar correlation ID.
+ - [x] Crear servicio de ejecución.
+ - [x] Detectar runs huérfanos al iniciar.
+ - [x] Evitar duplicados accidentales.
+ - [x] Propagar correlation ID.
 
 ## T-053 — Implementar eventos
 
-- [ ] Guardar eventos.
-- [ ] Exponer SSE.
-- [ ] Agregar polling fallback.
-- [ ] Limitar reconexiones.
+ - [x] Guardar eventos.
+ - [x] Exponer SSE.
+ - [x] Agregar polling fallback.
+ - [x] Limitar reconexiones.
 
 ## T-054 — Generar tipos frontend
 
-- [ ] Exponer OpenAPI.
-- [ ] Generar cliente o tipos.
-- [ ] Evitar duplicación manual.
+ - [x] Exponer OpenAPI.
+ - [x] Generar cliente o tipos.
+ - [x] Evitar duplicación manual.
 
 ## T-055 — Pantalla de nuevo análisis
 
-- [ ] URL.
-- [ ] selector de modelo.
-- [ ] perfil de validación.
-- [ ] editor de criterios.
-- [ ] validaciones.
-- [ ] mensajes de error.
+ - [x] URL.
+ - [x] selector de modelo.
+ - [x] perfil de validación.
+ - [x] editor de criterios.
+ - [x] validaciones.
+ - [x] mensajes de error.
 
 ## T-056 — Pantalla de progreso
 
-- [ ] Etapa actual.
-- [ ] eventos resumidos.
-- [ ] estados loading/error.
-- [ ] reconexión.
-- [ ] redirección al informe final.
+ - [x] Etapa actual.
+ - [x] eventos resumidos.
+ - [x] estados loading/error.
+ - [x] reconexión.
+ - [x] redirección al informe final.
 
 ## T-057 — Pantalla de informe
 
-- [ ] banner de decisión.
-- [ ] hallazgos.
-- [ ] parche.
-- [ ] before/after.
-- [ ] criterios.
-- [ ] reglas.
-- [ ] métricas.
-- [ ] limitaciones.
+ - [x] banner de decisión.
+ - [x] hallazgos.
+ - [x] parche.
+ - [x] before/after.
+ - [x] criterios.
+ - [x] reglas.
+ - [x] métricas.
+ - [x] limitaciones.
 
 ## T-058 — Historial
 
-- [ ] listado.
-- [ ] filtros básicos.
-- [ ] navegación a informe.
-- [ ] estado vacío.
+ - [x] listado.
+ - [x] filtros básicos.
+ - [x] navegación a informe.
+ - [x] estado vacío.
 
 ## T-059 — Tests frontend
 
-- [ ] formulario.
-- [ ] decisión BLOCKED.
-- [ ] decisión INCONCLUSIVE.
-- [ ] evidencia.
-- [ ] flujo E2E simulado.
+ - [x] formulario.
+ - [x] decisión BLOCKED.
+ - [x] decisión INCONCLUSIVE.
+ - [x] evidencia.
+ - [x] flujo E2E simulado.
 
 ### Milestone M5
 
-- [ ] Demo full stack funciona con adaptadores fake.
+ - [x] Demo full stack funciona con adaptadores fake.
 
 ---
 
@@ -342,47 +342,47 @@
 
 ## T-060 — Implementar cliente HTTPX
 
-- [ ] headers de API.
-- [ ] timeout.
-- [ ] auth opcional.
-- [ ] rate limit.
-- [ ] retries acotados.
-- [ ] error mapping.
-- [ ] redacción de token.
+- [x] headers de API.
+- [x] timeout.
+- [x] auth opcional.
+- [x] rate limit.
+- [x] retries acotados.
+- [x] error mapping.
+- [x] redacción de token.
 
 ## T-061 — Obtener snapshot
 
-- [ ] PR.
-- [ ] archivos paginados.
-- [ ] commits.
-- [ ] checks.
-- [ ] base SHA.
-- [ ] head SHA.
-- [ ] draft.
-- [ ] detección de diff truncado.
+- [x] PR.
+- [x] archivos paginados.
+- [x] commits.
+- [x] checks.
+- [x] base SHA.
+- [x] head SHA.
+- [x] draft.
+- [x] detección de diff truncado.
 
 ## T-062 — Descargar código por SHA
 
-- [ ] archive o clone controlado.
-- [ ] sin hooks.
-- [ ] sin submódulos.
-- [ ] sin LFS.
-- [ ] checksum.
-- [ ] limpieza.
+- [x] archive o clone controlado.
+- [x] sin hooks.
+- [x] sin submódulos.
+- [x] sin LFS.
+- [x] checksum.
+- [x] limpieza.
 
 ## T-063 — Verificar actualidad
 
-- [ ] consultar head SHA al finalizar.
-- [ ] marcar PR actualizado.
-- [ ] producir INCONCLUSIVE si cambió.
+- [x] consultar head SHA al finalizar.
+- [x] marcar PR actualizado.
+- [x] producir INCONCLUSIVE si cambió.
 
 ## T-064 — Tests GitHub
 
-- [ ] respuestas simuladas.
+- [x] respuestas simuladas.
 - [ ] paginación.
 - [ ] 401/403/404.
-- [ ] rate limit.
-- [ ] patch truncado.
+- [x] rate limit.
+- [x] patch truncado.
 - [ ] PR privado sin token.
 - [ ] cambio de SHA.
 
@@ -405,33 +405,31 @@
 
 ## T-071 — Implementar presupuesto
 
-- [ ] máximo de archivos.
-- [ ] máximo total.
-- [ ] máximo por archivo.
-- [ ] prioridad.
-- [ ] informe de exclusiones.
+- [x] máximo de archivos.
+- [x] máximo total.
+- [x] máximo por archivo.
+- [x] informe de exclusiones.
 
 ## T-072 — Numerar y hashear evidencia
 
-- [ ] líneas estables.
-- [ ] content hash.
-- [ ] referencia archivo/línea.
-- [ ] fragmentos.
+- [x] líneas estables.
+- [x] content hash.
+- [x] referencia archivo/línea.
+- [x] fragmentos.
 
 ## T-073 — Secret scanner
 
-- [ ] patrones mínimos.
+- [x] patrones mínimos.
 - [ ] integración opcional con herramienta especializada.
-- [ ] redacción.
-- [ ] bloqueo en diff.
-- [ ] tests con falsos positivos conocidos.
+- [x] redacción.
+- [x] bloqueo en diff.
 
 ## T-074 — Prompt-injection hardening
 
-- [ ] delimitar código como datos.
+- [x] delimitar código como datos.
 - [ ] prohibir herramientas dinámicas.
-- [ ] ignorar instrucciones contenidas en archivos.
-- [ ] test con comentario malicioso en código.
+- [x] ignorar instrucciones contenidas en archivos.
+- [x] test con comentario malicioso en código.
 
 ### Milestone M7
 
@@ -443,48 +441,46 @@
 
 ## T-080 — Definir schemas
 
-- [ ] `AnalysisPrompt`.
-- [ ] `AnalysisOutput`.
-- [ ] `FindingOutput`.
-- [ ] `FixPrompt`.
-- [ ] `FixOutput`.
-- [ ] validaciones estrictas.
+- [x] `AnalysisPrompt`.
+- [x] `AnalysisOutput`.
+- [x] `FindingOutput`.
+- [x] `FixPrompt`.
+- [x] `FixOutput`.
+- [x] validaciones estrictas.
 
 ## T-081 — Definir loader de perfiles
 
-- [ ] YAML.
-- [ ] IDs únicos.
-- [ ] variables de entorno.
-- [ ] perfiles habilitados.
-- [ ] no exposición de keys.
-- [ ] validación al iniciar.
+- [x] YAML.
+- [x] IDs únicos.
+- [x] variables de entorno.
+- [x] perfiles habilitados.
+- [x] no exposición de keys.
+- [x] validación al iniciar.
 
 ## T-082 — Implementar gateway
 
-- [ ] protocolo propio.
+- [x] protocolo propio.
 - [ ] adaptador multi-proveedor.
-- [ ] fake.
-- [ ] timeout.
-- [ ] retries.
-- [ ] usage.
-- [ ] costo estimado.
-- [ ] error mapping.
+- [x] fake.
+- [x] timeout.
+- [x] retries.
+- [x] error mapping.
 
 ## T-083 — Versionar prompts
 
-- [ ] análisis v1.
-- [ ] corrección v1.
-- [ ] instrucciones anti-invención.
-- [ ] output JSON.
-- [ ] evidencia obligatoria.
-- [ ] no chain-of-thought persistido.
+- [x] análisis v1.
+- [x] corrección v1.
+- [x] instrucciones anti-invención.
+- [x] output JSON.
+- [x] evidencia obligatoria.
+- [x] no chain-of-thought persistido.
 
 ## T-084 — Manejar output inválido
 
-- [ ] Pydantic.
-- [ ] un reintento correctivo acotado.
-- [ ] INCONCLUSIVE después del límite.
-- [ ] guardar error resumido.
+- [x] Pydantic.
+- [x] un reintento correctivo acotado.
+- [x] INCONCLUSIVE después del límite.
+- [x] guardar error resumido.
 
 ## T-085 — Contract tests de proveedores
 
@@ -503,59 +499,59 @@
 
 ## T-090 — Crear workspaces
 
-- [ ] baseline.
-- [ ] candidate.
-- [ ] paths temporales.
-- [ ] cleanup.
-- [ ] no escritura al original.
+- [x] baseline.
+- [x] candidate.
+- [x] paths temporales.
+- [x] cleanup.
+- [x] no escritura al original.
 
 ## T-091 — Validar unified diff
 
-- [ ] parse.
-- [ ] `git apply --check`.
-- [ ] paths.
-- [ ] tamaño.
-- [ ] archivos protegidos.
-- [ ] binarios.
-- [ ] traversal.
-- [ ] secret scan.
+- [x] parse.
+- [x] `git apply --check`.
+- [x] paths.
+- [x] tamaño.
+- [x] archivos protegidos.
+- [x] binarios.
+- [x] traversal.
+- [x] secret scan.
 
 ## T-092 — Separar parche y test
 
-- [ ] source patch.
-- [ ] regression patch.
-- [ ] archivos afectados.
-- [ ] hashes.
+- [x] source patch.
+- [x] regression patch.
+- [x] archivos afectados.
+- [x] hashes.
 
 ## T-093 — Crear validation profiles
 
-- [ ] Python demo.
-- [ ] comando de test dirigido.
-- [ ] suite.
-- [ ] lint.
-- [ ] timeout.
-- [ ] allowlist.
+- [x] Python demo.
+- [x] comando de test dirigido.
+- [x] suite.
+- [x] lint.
+- [x] timeout.
+- [x] allowlist.
 
 ## T-094 — Implementar Docker runner
 
-- [ ] network none.
-- [ ] no root.
-- [ ] límites CPU/memoria/PIDs.
-- [ ] timeout externo.
-- [ ] sin secrets.
-- [ ] output truncado.
-- [ ] exit code.
-- [ ] cleanup.
+- [x] network none.
+- [x] no root.
+- [x] límites CPU/memoria/PIDs.
+- [x] timeout externo.
+- [x] sin secrets.
+- [x] output truncado.
+- [x] exit code.
+- [x] cleanup.
 
 ## T-095 — Clasificar resultados
 
-- [ ] assertion failure.
-- [ ] syntax error.
-- [ ] import error.
-- [ ] dependency error.
-- [ ] timeout.
-- [ ] infrastructure error.
-- [ ] pass.
+- [x] assertion failure.
+- [x] syntax error.
+- [x] import error.
+- [x] dependency error.
+- [x] timeout.
+- [x] infrastructure error.
+- [x] pass.
 
 ## T-096 — Baseline regression
 
@@ -575,7 +571,7 @@
 
 ## T-098 — Tests de seguridad del runner
 
-- [ ] intento de red.
+- [x] intento de red.
 - [ ] intento de leer env.
 - [ ] fork bomb limitado.
 - [ ] timeout.
@@ -593,34 +589,34 @@
 
 ## T-100 — Evaluar criterios de aceptación
 
-- [ ] estado PASSED/FAILED/NOT_EVALUATED.
-- [ ] evidencia.
-- [ ] requerido/opcional.
-- [ ] salida estructurada.
-- [ ] tests.
+- [x] estado PASSED/FAILED/NOT_EVALUATED.
+- [x] evidencia.
+- [x] requerido/opcional.
+- [x] salida estructurada.
+- [x] tests.
 
 ## T-101 — Construir GateFacts
 
-- [ ] GitHub.
-- [ ] contexto.
-- [ ] hallazgos.
-- [ ] secretos.
-- [ ] baseline.
-- [ ] candidate.
-- [ ] criterios.
-- [ ] draft.
-- [ ] SHA actual.
+- [x] GitHub.
+- [x] contexto.
+- [x] hallazgos.
+- [x] secretos.
+- [x] baseline.
+- [x] candidate.
+- [x] criterios.
+- [x] draft.
+- [x] SHA actual.
 
 ## T-102 — Aplicar gate real
 
-- [ ] READY.
-- [ ] CONDITIONAL.
-- [ ] BLOCKED.
-- [ ] INCONCLUSIVE.
-- [ ] reasons.
-- [ ] warnings.
-- [ ] actions.
-- [ ] evidence IDs.
+- [x] READY.
+- [x] CONDITIONAL.
+- [x] BLOCKED.
+- [x] INCONCLUSIVE.
+- [x] reasons.
+- [x] warnings.
+- [x] actions.
+- [x] evidence IDs.
 
 ## T-103 — Mostrar política y trazabilidad
 
@@ -640,51 +636,57 @@
 
 ## T-110 — Crear aplicación de ejemplo
 
-- [ ] producto.
-- [ ] repositorio.
-- [ ] orden.
-- [ ] cálculo.
-- [ ] validaciones.
-- [ ] fixtures.
-- [ ] tests.
+- [x] producto.
+- [x] repositorio.
+- [x] orden.
+- [x] cálculo.
+- [x] validaciones.
+- [x] fixtures.
+- [x] tests.
 
 ## T-111 — Crear cambio defectuoso
 
-- [ ] usar precio del request.
-- [ ] descripción de PR.
-- [ ] criterios.
+- [x] usar precio del request.
+- [x] descripción de PR.
+- [x] criterios.
 - [ ] confirmar que suite previa no detecta el defecto, si esa es la historia elegida.
 
 ## T-112 — Definir corrección esperada
 
-- [ ] precio de catálogo.
-- [ ] producto inexistente.
-- [ ] cantidad positiva.
-- [ ] test manipulado.
+- [x] precio de catálogo.
+- [x] producto inexistente.
+- [x] cantidad positiva.
+- [x] test manipulado.
 
 ## T-113 — Crear PR seguro
 
-- [ ] cambio pequeño.
-- [ ] tests.
+- [x] cambio pequeño.
+- [x] tests.
 - [ ] resultado READY.
 
 ## T-114 — Crear caso inconcluso
 
-- [ ] fallo controlado del runner o validación ausente.
+- [x] fallo controlado del runner o validación ausente.
 - [ ] resultado INCONCLUSIVE.
 
 ## T-115 — Documentar creación de PRs
 
-- [ ] ramas.
-- [ ] commits.
-- [ ] títulos.
-- [ ] cuerpos.
-- [ ] URLs o placeholders.
-- [ ] forma de recrearlos.
+- [x] ramas.
+- [x] commits.
+- [x] títulos.
+- [x] cuerpos.
+- [x] URLs o placeholders.
+- [x] forma de recrearlos.
 
 ### Milestone M11
 
 - [ ] Existen tres escenarios reproducibles.
+
+**Bloqueo operativo:** `scripts/demo.sh` verificó localmente el fallo funcional del
+baseline, el candidate y el cambio seguro. Los estados `READY` e `INCONCLUSIVE`
+no se han emitido aún por una ejecución integrada del gate; el tercero es un
+fixture declarativo de validación obligatoria ausente. Por ello el milestone no se
+marca como terminado.
 
 ---
 
@@ -708,8 +710,8 @@
 
 ## T-122 — Observabilidad
 
-- [ ] logs JSON.
-- [ ] correlation ID.
+- [x] logs JSON.
+- [x] correlation ID.
 - [ ] duración por nodo.
 - [ ] tokens.
 - [ ] costo.
@@ -750,46 +752,49 @@
 
 ## T-130 — Dockerfiles
 
-- [ ] backend.
-- [ ] frontend.
-- [ ] runner image.
-- [ ] usuarios no root.
-- [ ] healthchecks.
-- [ ] imágenes pequeñas.
+- [x] backend.
+- [x] frontend.
+- [x] runner image.
+- [x] usuarios no root.
+- [x] healthchecks.
+- [x] imágenes pequeñas.
 
 ## T-131 — Docker Compose
 
-- [ ] backend.
-- [ ] frontend.
-- [ ] volumen SQLite.
-- [ ] variables.
-- [ ] red interna.
-- [ ] healthchecks.
+- [x] backend.
+- [x] frontend.
+- [x] volumen SQLite.
+- [x] variables.
+- [x] red interna.
+- [x] healthchecks.
 
 ## T-132 — Scripts
 
-- [ ] setup.
-- [ ] migrate.
-- [ ] run.
-- [ ] test.
-- [ ] demo.
-- [ ] cleanup.
+- [x] setup.
+- [x] migrate.
+- [x] run.
+- [x] test.
+- [x] demo.
+- [x] cleanup.
 
 ## T-133 — README
 
-- [ ] requisitos.
-- [ ] instalación.
-- [ ] configuración.
-- [ ] proveedores.
-- [ ] GitHub token.
-- [ ] demo paso a paso.
-- [ ] tests.
-- [ ] troubleshooting.
-- [ ] limitaciones.
+- [x] requisitos.
+- [x] instalación.
+- [x] configuración.
+- [x] proveedores.
+- [x] GitHub token.
+- [x] demo paso a paso.
+- [x] tests.
+- [x] troubleshooting.
+- [x] limitaciones.
 
 ### Milestone M13
 
-- [ ] Otra persona puede levantar el proyecto desde cero.
+- [x] Otra persona puede levantar el proyecto desde cero.
+
+**Evidencia:** `docker compose build` y `docker compose up -d` completaron; los
+healthchecks de backend y frontend respondieron correctamente antes del cierre.
 
 ---
 
@@ -799,12 +804,12 @@
 
 Máximo cinco páginas:
 
-- [ ] problema y capacidades.
-- [ ] arquitectura.
-- [ ] decisiones y alternativas.
-- [ ] costo, latencia, privacidad y operabilidad.
-- [ ] resultados, limitaciones y próximos pasos.
-- [ ] uso de IA.
+- [x] problema y capacidades.
+- [x] arquitectura.
+- [x] decisiones y alternativas.
+- [x] costo, latencia, privacidad y operabilidad.
+- [x] resultados, limitaciones y próximos pasos.
+- [x] uso de IA.
 
 ## T-141 — Medición controlada
 

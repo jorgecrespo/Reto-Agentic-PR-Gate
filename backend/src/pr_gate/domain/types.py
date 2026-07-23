@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from enum import StrEnum
 from urllib.parse import urlparse
@@ -29,6 +30,37 @@ class AcceptanceStatus(StrEnum):
     PASSED = "PASSED"
     FAILED = "FAILED"
     NOT_EVALUATED = "NOT_EVALUATED"
+
+
+class ValidationStatus(StrEnum):
+    PASSED = "PASSED"
+    FAILED = "FAILED"
+    NOT_EXECUTED = "NOT_EXECUTED"
+    INFRASTRUCTURE_ERROR = "INFRASTRUCTURE_ERROR"
+
+
+@dataclass(frozen=True)
+class CommitSha:
+    value: str
+
+    def __post_init__(self) -> None:
+        if not re.fullmatch(r"[0-9a-fA-F]{40}", self.value):
+            raise ValueError("El SHA debe ser un hash Git de 40 caracteres hexadecimales.")
+
+    def __str__(self) -> str:
+        return self.value.lower()
+
+
+@dataclass(frozen=True)
+class PolicyVersion:
+    value: str
+
+    def __post_init__(self) -> None:
+        if not re.fullmatch(r"\d+\.\d+\.\d+", self.value):
+            raise ValueError("La versión de política debe usar formato semántico.")
+
+    def __str__(self) -> str:
+        return self.value
 
 
 @dataclass(frozen=True)
@@ -77,6 +109,13 @@ class GateFacts:
     tests_changed: bool
     pr_is_draft: bool
     no_newer_pr: bool | None
+    evidence_by_rule: tuple[tuple[str, tuple[str, ...]], ...] = ()
+
+    def evidence_for(self, rule_id: str) -> tuple[str, ...]:
+        for candidate_rule_id, evidence_ids in self.evidence_by_rule:
+            if candidate_rule_id == rule_id:
+                return evidence_ids
+        return ()
 
 
 @dataclass(frozen=True)
@@ -102,3 +141,19 @@ class GateDecision:
     @property
     def not_evaluated_rules(self) -> tuple[GateRuleResult, ...]:
         return tuple(rule for rule in self.rules if rule.outcome is RuleOutcome.UNKNOWN)
+
+    @property
+    def warnings(self) -> tuple[GateRuleResult, ...]:
+        return tuple(
+            rule
+            for rule in self.rules
+            if rule.rule_id in {"GATE-013", "GATE-014"} and rule.outcome is RuleOutcome.FAIL
+        )
+
+    @property
+    def required_actions(self) -> tuple[str, ...]:
+        return tuple(
+            f"Resolver {rule.rule_id}: {rule.message}"
+            for rule in self.rules
+            if rule.outcome in {RuleOutcome.FAIL, RuleOutcome.UNKNOWN}
+        )

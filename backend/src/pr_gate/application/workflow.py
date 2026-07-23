@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from pr_gate.application.models import AnalysisOutput, FixOutput
+from pr_gate.infrastructure.context import ContextLimits, build_context_bundle
 from pr_gate.infrastructure.github import PullRequestSnapshot
 from pr_gate.infrastructure.llm import LLMError, OpenAILLMGateway
 from pr_gate.infrastructure.patches import PatchValidationError, validate_patch_shape
@@ -39,22 +40,8 @@ class WorkflowEvidence:
 
 
 def build_context(snapshot: PullRequestSnapshot, max_characters: int = 40_000) -> tuple[str, bool]:
-    fragments = [f"PR title: {snapshot.title}", f"PR body: {snapshot.body}"]
-    secrets_detected = False
-    used = sum(len(fragment) for fragment in fragments)
-    for item in snapshot.files:
-        path = str(item.get("filename", ""))
-        patch = str(item.get("patch", ""))
-        if _SENSITIVE_PATH.search(path):
-            continue
-        redacted = _SECRET.sub("[REDACTED_SECRET]", patch)
-        secrets_detected = secrets_detected or redacted != patch
-        fragment = f"\nFILE: {path}\n{redacted}"
-        if used + len(fragment) > max_characters:
-            break
-        fragments.append(fragment)
-        used += len(fragment)
-    return "\n".join(fragments), secrets_detected
+    bundle = build_context_bundle(snapshot, ContextLimits(max_total_characters=max_characters))
+    return bundle.prompt, bundle.secrets_detected
 
 
 async def run_candidate_validation(

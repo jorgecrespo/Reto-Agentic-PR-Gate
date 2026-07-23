@@ -5,12 +5,18 @@ services:
       dockerfile: backend/runner.Dockerfile
     image: pr-gate-runner:latest
     command: ["true"]
+    network_mode: none
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
   backend:
     build:
       context: .
       dockerfile: backend/Dockerfile
     environment:
-      DATABASE_URL: sqlite:////data/pr_gate.db
+      DATABASE_URL: sqlite:////data/pr_gate_v2.db
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     volumes:
@@ -20,13 +26,42 @@ services:
         condition: service_completed_successfully
     ports:
       - "8000:8000"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
   frontend:
     build:
       context: .
       dockerfile: frontend/Dockerfile
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
-      - "5173:80"
+      - "5173:8080"
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+      - /var/run
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8080/health | grep -q ok"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
 volumes:
   pr-gate-data:
