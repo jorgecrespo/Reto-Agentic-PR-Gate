@@ -1,0 +1,1 @@
+"""Agentic PR Gate application."""

@@ -1,0 +1,9 @@
+models:
+  - id: openai-small
+    provider: openai
+    model: gpt-4.1-mini
+    api_key_env: OPENAI_API_KEY
+    temperature: 0
+    timeout_seconds: 60
+    max_retries: 2
+    enabled: true

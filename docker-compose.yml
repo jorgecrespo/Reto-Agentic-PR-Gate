@@ -1,0 +1,32 @@
+services:
+  runner-image:
+    build:
+      context: .
+      dockerfile: backend/runner.Dockerfile
+    image: pr-gate-runner:latest
+    command: ["true"]
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      DATABASE_URL: sqlite:////data/pr_gate.db
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    volumes:
+      - pr-gate-data:/data
+    depends_on:
+      runner-image:
+        condition: service_completed_successfully
+    ports:
+      - "8000:8000"
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+volumes:
+  pr-gate-data:

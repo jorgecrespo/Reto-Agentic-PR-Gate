@@ -1,0 +1,48 @@
+version: "1.0.0"
+target_stage: QA
+rules:
+  - id: GATE-001
+    description: Analysis is fixed to the current head SHA
+    failure_status: INCONCLUSIVE
+  - id: GATE-002
+    description: Minimum context is available
+    failure_status: INCONCLUSIVE
+  - id: GATE-003
+    description: Required tests were executed
+    failure_status: INCONCLUSIVE
+  - id: GATE-004
+    description: Required tests passed
+    failure_status: BLOCKED
+  - id: GATE-005
+    description: No unmitigated critical findings
+    failure_status: BLOCKED
+  - id: GATE-006
+    description: No secrets were detected
+    failure_status: BLOCKED
+  - id: GATE-007
+    description: Required acceptance criteria were evaluated
+    failure_status: INCONCLUSIVE
+  - id: GATE-008
+    description: Required acceptance criteria passed
+    failure_status: BLOCKED
+  - id: GATE-009
+    description: Candidate patch was applicable
+    failure_status: BLOCKED
+  - id: GATE-010
+    description: Regression test reproduced the defect
+    failure_status: BLOCKED
+  - id: GATE-011
+    description: Regression test passed with the patch
+    failure_status: BLOCKED
+  - id: GATE-012
+    description: Candidate suite passed
+    failure_status: BLOCKED
+  - id: GATE-013
+    description: Business logic changes include tests
+    failure_status: CONDITIONAL
+  - id: GATE-014
+    description: PR is not a draft
+    failure_status: CONDITIONAL
+  - id: GATE-015
+    description: No newer PR revision exists
+    failure_status: INCONCLUSIVE
