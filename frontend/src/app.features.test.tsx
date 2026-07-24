@@ -15,7 +15,7 @@ function renderApp(path = "/") { return render(<QueryClientProvider client={new 
 afterEach(() => vi.unstubAllGlobals());
 
 describe("frontend vertical slice", () => {
-  it("loads profiles, submits criteria and navigates to the simulated report", async () => {
+  it("loads profiles, submits analysis and navigates to the simulated report", async () => {
     const fetchMock = vi.fn((path: string, init?: RequestInit) => {
       if (path.includes("config/models")) return response({ models: [{ id: "gemini-small", provider: "gemini", model: "gemini-2.0-flash", enabled: true }, { id: "openai-small", provider: "openai", model: "gpt-4.1-mini", enabled: true }] });
       if (path.includes("validation-profiles")) return response({ validation_profiles: [{ id: "python-demo" }] });
@@ -29,15 +29,11 @@ describe("frontend vertical slice", () => {
     });
     renderApp();
     fireEvent.change(await screen.findByLabelText("URL del pull request"), { target: { value: "https://github.com/acme/shop/pull/1" } });
-    fireEvent.click(screen.getByRole("button", { name: "Añadir criterio" }));
-    fireEvent.change(screen.getByLabelText("Criterio 1"), { target: { value: "El precio usa catálogo" } });
-    fireEvent.change(screen.getByLabelText("Tests criterio 1"), { target: { value: "test_catalog_price" } });
     fireEvent.click(screen.getByRole("button", { name: "Analizar PR" }));
     await screen.findByText("Existe un bloqueo verificable.");
     const submitted = JSON.parse(String(fetchMock.mock.calls.find(([path]) => path === "/api/v1/analyses")?.[1]?.body));
     expect(submitted.model_profile_id).toBe("gemini-small");
-    expect(submitted.acceptance_criteria[0].text).toBe("El precio usa catálogo");
-    expect(submitted.acceptance_criteria[0].validation_tests).toEqual(["test_catalog_price"]);
+    expect(submitted.acceptance_criteria).toBeUndefined();
   });
 
   it("renders BLOCKED and its file evidence", async () => {

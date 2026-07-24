@@ -4,12 +4,10 @@ export type RuleOutcome = "PASS" | "FAIL" | "UNKNOWN";
 
 export interface ModelProfile { id: string; provider: string; model: string; enabled: boolean }
 export interface ValidationProfile { id: string }
-export interface AcceptanceCriterion { id: string; text: string; required: boolean; validation_tests?: string[] }
 export interface CreateAnalysisRequest {
   pull_request_url: string;
   model_profile_id: string;
   validation_profile_id: string;
-  acceptance_criteria: AcceptanceCriterion[];
 }
 export interface AnalysisCreated { analysis_id: string; status: DecisionStatus; deduplicated: boolean }
 export interface RunEvent { sequence: number; node: string; message: string; created_at?: string }

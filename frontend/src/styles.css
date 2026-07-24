@@ -1,8 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,500;9..144,700&display=swap');
 
-:root { color: #1c2423; background: #edf0ea; font-family: "DM Mono", monospace; font-size: 15px; }
+:root { color: #1c2423; background: #fefefe; font-family: "DM Mono", monospace; font-size: 15px; }
 * { box-sizing: border-box; }
-body { margin: 0; background-image: linear-gradient(#d7ddd4 1px, transparent 1px), linear-gradient(90deg, #d7ddd4 1px, transparent 1px); background-size: 48px 48px; }
+body { margin: 0; background: #fefefe; }
 header { min-height: 68px; padding: 0 5vw; border-bottom: 1px solid #1c2423; display: flex; justify-content: space-between; align-items: center; background: #edf0eaf0; }
 a { color: inherit; } .wordmark { text-decoration: none; letter-spacing: -.08em; font-size: 1.25rem; } .wordmark b { background: #d9ff4f; padding: 3px 5px; }
 nav { display: flex; gap: 24px; align-items: center; font-size: .72rem; } nav a { text-underline-offset: 4px; } nav span { color: #66706c; border-left: 1px solid #aab3ad; padding-left: 24px; }

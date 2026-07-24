@@ -5,7 +5,7 @@ import os
 from dataclasses import dataclass
 from typing import Protocol, cast
 
-from openai import APITimeoutError, AsyncOpenAI, OpenAIError
+from openai import APITimeoutError, AsyncOpenAI, OpenAIError, RateLimitError
 from pydantic import ValidationError
 
 from pr_gate.application.models import AnalysisOutput, AnalysisPrompt, FixOutput, FixPrompt
@@ -187,6 +187,10 @@ class OpenAILLMGateway:
                 last_error = error
             except APITimeoutError as error:
                 last_error = error
+            except RateLimitError as error:
+                raise LLMError(
+                    f"El proveedor LLM devolvió 429: {error}", "LLM_RATE_LIMIT"
+                ) from error
             except OpenAIError as error:
                 raise LLMError("El proveedor LLM no estuvo disponible.") from error
         raise LLMError(
@@ -317,6 +321,10 @@ class GeminiLLMGateway:
                 last_error = error
             except APITimeoutError as error:
                 last_error = error
+            except RateLimitError as error:
+                raise LLMError(
+                    f"El proveedor LLM devolvió 429: {error}", "LLM_RATE_LIMIT"
+                ) from error
             except OpenAIError as error:
                 raise LLMError("El proveedor LLM no estuvo disponible.") from error
         raise LLMError(

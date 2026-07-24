@@ -2,25 +2,22 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { FormEvent, useEffect, useState } from "react";
 import { Link, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { api } from "./api/client";
-import type { AcceptanceCriterion, Analysis, DecisionStatus, Finding, Rule, RunEvent, ValidationResult } from "./api/contract";
+import type { Analysis, DecisionStatus, Finding, Rule, RunEvent, ValidationResult } from "./api/contract";
 
 function Header() { return <header><Link to="/" className="wordmark">PR/QA <b>GATE</b></Link><nav><Link to="/">Nuevo análisis</Link><Link to="/analyses">Historial</Link><span>solo lectura</span></nav></header>; }
 function Decision({ status }: { status: DecisionStatus }) { return <span className={`decision ${status.toLowerCase()}`}>{status}</span>; }
 function ErrorMessage({ error }: { error: unknown }) { return <p role="alert" className="error">{error instanceof Error ? error.message : "No fue posible completar la solicitud."}</p>; }
 
 function NewAnalysis() {
-  const navigate = useNavigate(); const [url, setUrl] = useState(""); const [criteria, setCriteria] = useState<AcceptanceCriterion[]>([]);
+  const navigate = useNavigate(); const [url, setUrl] = useState("");
   const models = useQuery({ queryKey: ["models"], queryFn: api.models }); const profiles = useQuery({ queryKey: ["validation-profiles"], queryFn: api.validationProfiles });
   const [modelId, setModelId] = useState(""); const [profileId, setProfileId] = useState("");
   useEffect(() => { if (!modelId && models.data?.models[0]) setModelId(models.data.models[0].id); }, [models.data, modelId]);
   useEffect(() => { if (!profileId && profiles.data?.validation_profiles[0]) setProfileId(profiles.data.validation_profiles[0].id); }, [profiles.data, profileId]);
-  const create = useMutation({ mutationFn: () => api.createAnalysis({ pull_request_url: url, model_profile_id: modelId, validation_profile_id: profileId, acceptance_criteria: criteria }), onSuccess: ({ analysis_id }) => navigate(`/analyses/${analysis_id}`) });
+  const create = useMutation({ mutationFn: () => api.createAnalysis({ pull_request_url: url, model_profile_id: modelId, validation_profile_id: profileId }), onSuccess: ({ analysis_id }) => navigate(`/analyses/${analysis_id}`) });
   const submit = (event: FormEvent) => { event.preventDefault(); if (!modelId || !profileId) return; create.mutate(); };
-  const addCriterion = () => setCriteria([...criteria, { id: `AC-${criteria.length + 1}`, text: "", required: true, validation_tests: [] }]);
-  const updateCriterion = (index: number, patch: Partial<AcceptanceCriterion>) => setCriteria(criteria.map((item, current) => current === index ? { ...item, ...patch } : item));
   return <main className="landing"><p className="eyebrow">PR → QA / evidence first</p><h1>Decidir con pruebas,<br /><i>no con intuición.</i></h1><p className="lede">Analiza un pull request de GitHub, valida una corrección en aislamiento y aplica una política trazable.</p><form onSubmit={submit}><label htmlFor="pr-url">URL del pull request</label><input id="pr-url" type="url" required placeholder="https://github.com/owner/repo/pull/42" value={url} onChange={(event) => setUrl(event.target.value)} />
     <div className="select-grid"><label>Modelo<select aria-label="Modelo" value={modelId} onChange={(event) => setModelId(event.target.value)}>{models.data?.models.map((item) => <option key={item.id} value={item.id}>{item.id} · {item.provider} · {item.model}</option>)}</select></label><label>Perfil de validación<select aria-label="Perfil de validación" value={profileId} onChange={(event) => setProfileId(event.target.value)}>{profiles.data?.validation_profiles.map((item) => <option key={item.id} value={item.id}>{item.id}</option>)}</select></label></div>
-    <div className="criteria"><div><label>Criterios de aceptación</label><button type="button" className="secondary" onClick={addCriterion}>Añadir criterio</button></div>{criteria.map((item, index) => <div className="criterion" key={index}><input aria-label={`Criterio ${index + 1}`} placeholder="Comportamiento verificable" value={item.text} required onChange={(event) => updateCriterion(index, { text: event.target.value })} /><input aria-label={`Tests criterio ${index + 1}`} placeholder="Tests: test_catalog_price, test_qty" value={(item.validation_tests ?? []).join(", ")} onChange={(event) => updateCriterion(index, { validation_tests: event.target.value.split(",").map((value) => value.trim()).filter(Boolean) })} /><label><input type="checkbox" checked={item.required} onChange={(event) => updateCriterion(index, { required: event.target.checked })} /> Obligatorio</label><button type="button" className="secondary" onClick={() => setCriteria(criteria.filter((_, current) => current !== index))}>Quitar</button></div>)}</div>
     <button disabled={create.isPending || models.isPending || profiles.isPending}>{create.isPending ? "Iniciando..." : "Analizar PR"}</button>{create.isError && <ErrorMessage error={create.error} />}</form><aside><b>Alcance controlado</b><span>GitHub read-only · comandos administrados · sin secretos en el navegador</span></aside></main>;
 }
 

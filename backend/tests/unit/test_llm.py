@@ -1,6 +1,8 @@
 from types import SimpleNamespace
 
+import httpx
 import pytest
+from openai import RateLimitError
 from pydantic import ValidationError
 
 from pr_gate.application.models import AnalysisOutput, AnalysisPrompt, FixOutput, FixPrompt
@@ -103,6 +105,43 @@ async def test_gemini_gateway_uses_openai_compatible_chat_api(
     assert gateway.usage is not None
     assert gateway.usage.input_tokens == 8
     assert gateway.usage.output_tokens == 5
+
+
+@pytest.mark.asyncio
+async def test_gemini_rate_limit_is_explicit(monkeypatch: pytest.MonkeyPatch) -> None:
+    request = httpx.Request("POST", "https://example.com")
+    response = httpx.Response(
+        429, request=request, content=b'{"error":{"message":"quota exceeded"}}'
+    )
+
+    class ChatCompletions:
+        async def create(self, **_: object) -> object:
+            raise RateLimitError(
+                "Error code: 429",
+                response=response,
+                body={"error": {"message": "quota exceeded"}},
+            )
+
+    client = SimpleNamespace(chat=SimpleNamespace(completions=ChatCompletions()))
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    monkeypatch.setattr("pr_gate.infrastructure.llm.AsyncOpenAI", lambda **kwargs: client)
+
+    profile = ModelProfile(
+        id="gemini-small",
+        provider="gemini",
+        model="gemini-2.0-flash",
+        api_key_env="GEMINI_API_KEY",
+        temperature=0,
+        timeout_seconds=60,
+        max_retries=0,
+        enabled=True,
+    )
+    gateway = GeminiLLMGateway(profile)
+
+    with pytest.raises(LLMError) as exc_info:
+        await gateway.analyze("safe context")
+    assert "429" in str(exc_info.value)
+    assert exc_info.value.code == "LLM_RATE_LIMIT"
 
 
 @pytest.mark.asyncio

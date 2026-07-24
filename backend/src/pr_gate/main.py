@@ -25,6 +25,7 @@ from pr_gate.graph.runtime import build_runtime_dependencies
 from pr_gate.infrastructure.config import ModelProfile, load_model_profiles, load_policy
 from pr_gate.infrastructure.database import AnalysisStore
 from pr_gate.infrastructure.github import GitHubError
+from pr_gate.infrastructure.llm import LLMError
 from pr_gate.observability import configure_logging
 
 
@@ -121,14 +122,22 @@ async def _run_analysis(analysis_id: str, request: CreateAnalysisInput) -> None:
         STORE.add_event(
             analysis_id, 9999, "finalize", "Análisis finalizado sin evidencia suficiente."
         )
+    except LLMError as error:
+        STORE.finish(
+            analysis_id,
+            "INCONCLUSIVE",
+            _inconclusive_report(analysis_id, request, str(error)),
+            str(error),
+        )
+        STORE.add_event(
+            analysis_id, 9999, "finalize", f"Análisis finalizado por error del LLM: {error.code}."
+        )
     except Exception as error:
         STORE.finish(
             analysis_id,
             "INCONCLUSIVE",
-            _inconclusive_report(
-                analysis_id, request, f"Error interno de análisis: {type(error).__name__}"
-            ),
-            f"Error interno de análisis: {type(error).__name__}",
+            _inconclusive_report(analysis_id, request, f"Error interno de análisis: {error}"),
+            f"Error interno de análisis: {error}",
         )
         STORE.add_event(analysis_id, 9999, "finalize", "Análisis finalizado por un error interno.")
 

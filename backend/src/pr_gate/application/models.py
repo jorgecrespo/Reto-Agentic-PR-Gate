@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from typing import Self
-
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class StrictModel(BaseModel):
@@ -20,16 +18,7 @@ class CreateAnalysisInput(StrictModel):
     pull_request_url: str
     model_profile_id: str
     validation_profile_id: str
-    acceptance_criteria: list[AcceptanceCriterionInput] = Field(min_length=1, max_length=20)
-
-    @model_validator(mode="after")
-    def require_verifiable_required_criteria(self) -> Self:
-        required = [item for item in self.acceptance_criteria if item.required]
-        if not required:
-            raise ValueError("Debe existir al menos un criterio de aceptación obligatorio.")
-        if any(not item.validation_tests for item in required):
-            raise ValueError("Cada criterio obligatorio debe declarar al menos un validation_test.")
-        return self
+    acceptance_criteria: list[AcceptanceCriterionInput] = Field(default_factory=list, max_length=20)
 
 
 class FindingOutput(StrictModel):

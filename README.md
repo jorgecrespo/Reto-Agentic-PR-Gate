@@ -11,10 +11,9 @@ determinística aportan evidencia y emiten `READY`, `CONDITIONAL`, `BLOCKED` o
   requisito para usar el prototipo: la validación del código del PR se ejecuta
   en contenedores efímeros creados por el propio servicio, por lo que Docker
   debe estar activo antes de arrancar. Verifíquelo con `docker info`.
-- Opcional: `GEMINI_API_KEY` para el perfil Gemini por defecto, `OPENAI_API_KEY`
-  para el perfil OpenAI y `GITHUB_TOKEN` de solo lectura para repositorios
-  privados o límites de API. Sin claves el sistema arranca igual y cada
-  análisis termina `INCONCLUSIVE` con la razón visible en el informe.
+- Para ejecutar análisis reales, copiá `.env.example` a `.env` y configurá al
+  menos una credencial de LLM: `GEMINI_API_KEY` o `OPENAI_API_KEY`.
+- `GITHUB_TOKEN` es opcional y ayuda con repositorios privados o límites de API.
 
 ## Uso
 
@@ -52,6 +51,28 @@ docker compose up --build
 Las claves se leen únicamente del entorno; nunca se guardan en SQLite, YAML,
 logs ni respuestas HTTP.
 
+## PRs de prueba
+
+Puede probar el funcionamiento con estos pull requests públicos del proyecto
+`Demo-e-commerce`:
+
+- <https://github.com/jorgecrespo/Demo-e-commerce/pull/1>
+- <https://github.com/jorgecrespo/Demo-e-commerce/pull/2>
+- <https://github.com/jorgecrespo/Demo-e-commerce/pull/3>
+- <https://github.com/jorgecrespo/Demo-e-commerce/pull/4>
+- <https://github.com/jorgecrespo/Demo-e-commerce/pull/5>
+- <https://github.com/jorgecrespo/Demo-e-commerce/pull/6>
+- <https://github.com/jorgecrespo/Demo-e-commerce/pull/7>
+
+## Flujo LangGraph
+
+El diagrama resume el flujo principal del análisis: validar la solicitud,
+obtener el snapshot del PR, preparar workspaces, construir y sanear el contexto,
+analizar con LLM, validar baseline y candidate, aplicar el quality gate y
+persistir el informe.
+
+![Flujo LangGraph](./grafo.png)
+
 ## Qué entrega un análisis
 
 El informe explica la decisión, no solo el estado final. Incluye la trazabilidad
@@ -62,63 +83,3 @@ acciones necesarias para avanzar.
 Los secretos nunca se muestran: el informe solo conserva evidencia segura como
 archivo, línea y tipo de patrón. Cuando el LLM o el runner no se ejecutan, el
 informe indica la causa; en ese caso no presenta tokens o costo como disponibles.
-
-## Cómo funciona
-
-Compose construye cuatro servicios: frontend (nginx publicado en `:5173`, que
-proxifica `/api/` al backend), backend (FastAPI en `:8000`, con el workflow
-LangGraph y la política determinística), un executor interno y la imagen de
-runner. El backend no monta el socket Docker: solo el executor recibe archives
-efímeros y monta ese socket para crear el runner con red deshabilitada, usuario
-no root, filesystem de solo lectura y límites de recursos. El executor no
-publica puertos al host; los servicios tienen capacidades Linux eliminadas y
-`no-new-privileges`. Los comandos de validación salen de
-`config/validation-profiles.yaml`; el LLM nunca elige qué se ejecuta.
-
-## Configuración y proveedores
-
-`config/models.example.yaml` define perfiles de servidor y solo referencia el
-nombre de una variable de entorno. `config/validation-profiles.yaml` fija argv,
-paths y timeout. Actualmente hay perfiles para Gemini y OpenAI; Gemini queda
-primero en la lista y por eso es el valor seleccionado por defecto en la UI.
-
-## Troubleshooting
-
-- Docker no disponible o daemon caído: la validación de código no degrada a
-  ejecución local; el análisis termina `INCONCLUSIVE`. Compruebe con
-  `docker info` que el daemon responde y repita `docker compose up --build`.
-- `401`, `403` o rate limit de GitHub: compruebe la URL, el acceso del token de
-  solo lectura y espere el reset indicado por GitHub.
-- Error de proveedor LLM: compruebe `GEMINI_API_KEY` u `OPENAI_API_KEY` solo en
-  el entorno backend; los errores no incluyen la clave.
-- DB heredada sin Alembic: borre el volumen con `docker compose down -v` o use
-  una ruta nueva mediante `DATABASE_URL`; el servicio no sobrescribe bases
-  ajenas.
-
-## Demo
-
-`scripts/create_demo_prs.md` describe cómo recrear en un fork descartable los
-tres PRs de demostración (`BLOCKED`, `READY` e `INCONCLUSIVE`).
-
-## Desarrollo (sin Docker)
-
-Requisitos adicionales: Python 3.12 con `uv` y Node 22 con npm.
-
-```bash
-./scripts/setup.sh
-uv run --project backend uvicorn pr_gate.main:app --reload
-npm --prefix frontend run dev
-```
-
-La UI de desarrollo queda en `http://localhost:5173` y la API en
-`http://localhost:8000`.
-
-## Controles
-
-```bash
-./scripts/test.sh
-```
-
-Incluye formato, lint, tipos y tests backend; lint, tipos, tests y build
-frontend. Los tests de integración Docker se omiten automáticamente si el
-daemon no está operativo.
