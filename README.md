@@ -51,19 +51,6 @@ docker compose up --build
 Las claves se leen únicamente del entorno; nunca se guardan en SQLite, YAML,
 logs ni respuestas HTTP.
 
-## PRs de prueba
-
-Puede probar el funcionamiento con estos pull requests públicos del proyecto
-`Demo-e-commerce`:
-
-- <https://github.com/jorgecrespo/Demo-e-commerce/pull/1>
-- <https://github.com/jorgecrespo/Demo-e-commerce/pull/2>
-- <https://github.com/jorgecrespo/Demo-e-commerce/pull/3>
-- <https://github.com/jorgecrespo/Demo-e-commerce/pull/4>
-- <https://github.com/jorgecrespo/Demo-e-commerce/pull/5>
-- <https://github.com/jorgecrespo/Demo-e-commerce/pull/6>
-- <https://github.com/jorgecrespo/Demo-e-commerce/pull/7>
-
 ## Flujo LangGraph
 
 El diagrama resume el flujo principal del análisis: validar la solicitud,
