@@ -3,10 +3,12 @@ from __future__ import annotations
 import hashlib
 import operator
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Annotated, Any, Protocol, TypedDict
 from uuid import uuid4
 
 from langgraph.graph import END, START, StateGraph
+from langgraph.types import Command
 
 from pr_gate.application.acceptance import (
     AcceptanceCriterion,
@@ -19,7 +21,11 @@ from pr_gate.domain.gate import evaluate_quality_gate
 from pr_gate.domain.types import GateFacts, PullRequestRef
 from pr_gate.infrastructure.context import build_context_bundle
 from pr_gate.infrastructure.github import PullRequestSnapshot
-from pr_gate.infrastructure.patches import PatchValidationError, validate_patch_shape
+from pr_gate.infrastructure.patches import (
+    PatchValidationError,
+    normalize_hunk_counts,
+    validate_patch_shape,
+)
 
 
 class WorkflowError(TypedDict):
@@ -43,14 +49,19 @@ class AnalysisState(TypedDict, total=False):
     context_bundle: str
     context_complete: bool
     context_excluded: list[str]
-    secret_scan: dict[str, bool]
+    secret_scan: dict[str, Any]
+    secret_evidence: list[dict[str, Any]]
     analysis_output: dict[str, Any]
     candidate_fix: dict[str, Any]
+    fix_attempts: int
+    patch_feedback: str
     patch_valid: bool
+    original_validation: dict[str, Any]
     baseline_validation: dict[str, Any]
     candidate_validation: dict[str, Any]
     acceptance_results: list[dict[str, Any]]
     gate_decision: dict[str, Any]
+    llm_usage: dict[str, int | float | None]
     finalized: bool
     events: Annotated[list[RunEvent], operator.add]
     errors: Annotated[list[WorkflowError], operator.add]
@@ -65,7 +76,7 @@ class PullRequestProvider(Protocol):
 class LLMGateway(Protocol):
     async def analyze(self, context: str) -> AnalysisOutput: ...
 
-    async def propose_fix(self, context: str) -> FixOutput: ...
+    async def propose_fix(self, context: str, feedback: str | None = None) -> FixOutput: ...
 
 
 class WorkspaceProvider(Protocol):
@@ -146,6 +157,86 @@ def _has_error(state: AnalysisState, code: str) -> bool:
     return any(error["code"] == code for error in state.get("errors", []))
 
 
+def _workspaces_ready(state: AnalysisState) -> bool:
+    return bool(state.get("baseline_workspace")) and bool(state.get("candidate_workspace"))
+
+
+def _workspace_fix_context(state: AnalysisState, max_characters: int = 20_000) -> str:
+    workspace = Path(str(state.get("candidate_workspace", "")))
+    if not workspace.is_dir():
+        return ""
+    paths = {
+        str(item.get("filename"))
+        for item in state.get("pr_snapshot", {}).get("files", [])
+        if isinstance(item, dict) and isinstance(item.get("filename"), str)
+    }
+    tests = workspace / "tests"
+    if tests.is_dir():
+        paths.update(
+            path.relative_to(workspace).as_posix()
+            for path in sorted(tests.rglob("*.py"))[:10]
+            if path.is_file()
+        )
+    sections: list[str] = []
+    remaining = max_characters
+    for relative_path in sorted(paths):
+        candidate = (workspace / relative_path).resolve()
+        if not candidate.is_relative_to(workspace.resolve()) or not candidate.is_file():
+            continue
+        content = candidate.read_text(errors="replace")
+        excerpt = content[:remaining]
+        sections.append(f"<workspace_file path={relative_path}>\n{excerpt}\n</workspace_file>")
+        remaining -= len(excerpt)
+        if remaining <= 0:
+            break
+    return "\n".join(sections)
+
+
+def _usage_from_gateway(gateway: Any) -> dict[str, int | float | None] | None:
+    usage = getattr(gateway, "usage", None)
+    if usage is None:
+        return None
+    if isinstance(usage, dict):
+        return {
+            "input_tokens": usage.get("input_tokens"),
+            "output_tokens": usage.get("output_tokens"),
+            "estimated_cost": usage.get("estimated_cost"),
+        }
+    return {
+        "input_tokens": getattr(usage, "input_tokens", None),
+        "output_tokens": getattr(usage, "output_tokens", None),
+        "estimated_cost": getattr(usage, "estimated_cost", None),
+    }
+
+
+def _merge_usage(
+    current: dict[str, int | float | None] | None, update: dict[str, int | float | None] | None
+) -> dict[str, int | float | None] | None:
+    if update is None:
+        return current
+    if current is None:
+        return dict(update)
+    merged: dict[str, int | float | None] = {
+        "input_tokens": current.get("input_tokens"),
+        "output_tokens": current.get("output_tokens"),
+        "estimated_cost": current.get("estimated_cost"),
+    }
+    for key in ("input_tokens", "output_tokens"):
+        current_value = merged.get(key)
+        update_value = update.get(key)
+        if isinstance(current_value, int) and isinstance(update_value, int):
+            merged[key] = current_value + update_value
+        elif current_value is None:
+            merged[key] = update_value
+    current_cost = merged.get("estimated_cost")
+    update_cost = update.get("estimated_cost")
+    if isinstance(current_cost, (int, float)) and isinstance(update_cost, (int, float)):
+        merged["estimated_cost"] = float(current_cost) + float(update_cost)
+    elif current_cost is None:
+        merged["estimated_cost"] = update_cost
+    return merged
+
+
 def build_graph(dependencies: GraphDependencies) -> Any:
     async def validate_request(state: AnalysisState) -> dict[str, Any]:
         request = state.get("request", {})
@@ -182,30 +273,82 @@ def build_graph(dependencies: GraphDependencies) -> Any:
             baseline, candidate = await dependencies.workspaces.prepare(_snapshot_from_state(state))
         except RuntimeError as error:
             return {
+                "prepare_workspaces_next": "apply_quality_gate",
                 **_event("prepare_workspaces", "No fue posible preparar workspaces."),
                 **_error("WORKSPACE_UNAVAILABLE", str(error)),
             }
         return {
+            "prepare_workspaces_next": "build_context",
             "baseline_workspace": baseline,
             "candidate_workspace": candidate,
             **_event("prepare_workspaces", "Workspaces efímeros preparados."),
         }
 
+    def after_prepare(state: AnalysisState) -> str:
+        return str(state.get("prepare_workspaces_next", "build_context"))
+
+    def route_after_prepare(state: AnalysisState) -> Command[Any]:
+        return Command(goto=state.get("prepare_workspaces_next", "build_context"))
+
     async def build_context_node(state: AnalysisState) -> dict[str, Any]:
+        if not _workspaces_ready(state):
+            return {
+                "context_bundle": "",
+                "context_complete": None,
+                "context_excluded": ["workspace unavailable"],
+                "secret_scan": {"detected": None},
+                "secret_evidence": [],
+                **_event("build_context", "Contexto omitido por falta de workspaces."),
+            }
         bundle = build_context_bundle(_snapshot_from_state(state))
+        workspace_context = _workspace_fix_context(state)
         return {
-            "context_bundle": bundle.prompt,
+            "context_bundle": (
+                f"{bundle.prompt}\n{workspace_context}" if workspace_context else bundle.prompt
+            ),
             "secret_scan": {"detected": bundle.secrets_detected},
+            "secret_evidence": [
+                {
+                    "path": item.path,
+                    "start_line": item.start_line,
+                    "end_line": item.end_line,
+                    "kinds": list(item.kinds),
+                }
+                for item in bundle.secret_evidence
+            ],
             "context_complete": bundle.complete,
             "context_excluded": list(bundle.excluded),
             **_event("build_context", "Contexto acotado construido."),
         }
 
     async def scan_context(state: AnalysisState) -> dict[str, Any]:
+        if not _workspaces_ready(state):
+            return {
+                "secret_scan": {"detected": None},
+                **_event("scan_context", "Escaneo omitido por falta de workspaces."),
+            }
         secret_found = bool(state.get("secret_scan", {}).get("detected"))
         return {
             "secret_scan": {"detected": secret_found},
             **_event("scan_context", "Contexto saneado."),
+        }
+
+    async def run_original_validation(state: AnalysisState) -> dict[str, Any]:
+        suite = await dependencies.runner.run(state["baseline_workspace"], "pr-suite")
+        lint = await dependencies.runner.run(state["baseline_workspace"], "pr-lint")
+        infrastructure = any(
+            bool(result.get("infrastructure_error") or result.get("timed_out"))
+            for result in (suite, lint)
+        )
+        return {
+            "original_validation": {
+                "tests_executed": not infrastructure,
+                "suite_passed": None
+                if infrastructure
+                else suite.get("exit_code") == 0 and lint.get("exit_code") == 0,
+                "results": [suite, lint],
+            },
+            **_event("run_original_validation", "Suite del PR actual ejecutada."),
         }
 
     async def analyze_change(state: AnalysisState) -> dict[str, Any]:
@@ -216,21 +359,44 @@ def build_graph(dependencies: GraphDependencies) -> Any:
                 **_event("analyze_change", "El análisis estructurado no estuvo disponible."),
                 **_error("LLM_UNAVAILABLE", str(error)),
             }
+        usage = _usage_from_gateway(dependencies.llm)
         return {
             "analysis_output": output.model_dump(),
+            **(
+                {"llm_usage": _merge_usage(state.get("llm_usage"), usage)}
+                if usage is not None
+                else {}
+            ),
             **_event("analyze_change", "Cambio analizado."),
         }
 
     async def generate_candidate_fix(state: AnalysisState) -> dict[str, Any]:
         try:
-            fix = await dependencies.llm.propose_fix(state["context_bundle"])
+            feedback = state.get("patch_feedback")
+            fix = (
+                await dependencies.llm.propose_fix(state["context_bundle"], str(feedback))
+                if feedback
+                else await dependencies.llm.propose_fix(state["context_bundle"])
+            )
         except RuntimeError as error:
             return {
                 **_event("generate_candidate_fix", "No fue posible proponer corrección."),
                 **_error("LLM_UNAVAILABLE", str(error)),
             }
+        usage = _usage_from_gateway(dependencies.llm)
+        fix_data = fix.model_dump()
+        fix_data["patch"] = normalize_hunk_counts(str(fix_data["patch"]))
+        fix_data["regression_test_patch"] = normalize_hunk_counts(
+            str(fix_data["regression_test_patch"])
+        )
         return {
-            "candidate_fix": fix.model_dump(),
+            "candidate_fix": fix_data,
+            "fix_attempts": int(state.get("fix_attempts", 0)) + 1,
+            **(
+                {"llm_usage": _merge_usage(state.get("llm_usage"), usage)}
+                if usage is not None
+                else {}
+            ),
             **_event("generate_candidate_fix", "Corrección propuesta."),
         }
 
@@ -238,21 +404,34 @@ def build_graph(dependencies: GraphDependencies) -> Any:
         fix = state["candidate_fix"]
         try:
             validate_patch_shape(str(fix["patch"]), dependencies.allowed_patch_prefixes)
-            validate_patch_shape(
-                str(fix["regression_test_patch"]), dependencies.allowed_patch_prefixes
-            )
+            regression_patch = str(fix["regression_test_patch"])
+            if regression_patch:
+                validate_patch_shape(regression_patch, dependencies.allowed_patch_prefixes)
         except PatchValidationError as error:
+            message = str(error)
+            if int(state.get("fix_attempts", 0)) < 2:
+                return {
+                    "patch_valid": False,
+                    "patch_feedback": message,
+                    **_event(
+                        "validate_patch_shape",
+                        "El parche es inválido; se solicitará una corrección.",
+                    ),
+                }
             return {
                 "patch_valid": False,
                 **_event("validate_patch_shape", "El parche no es aplicable dentro del perfil."),
-                **_error("INVALID_PATCH", str(error)),
+                **_error("INVALID_PATCH", message),
             }
         return {"patch_valid": True, **_event("validate_patch_shape", "Forma de parche válida.")}
 
     async def run_baseline_regression(state: AnalysisState) -> dict[str, Any]:
         fix = state["candidate_fix"]
-        applied = await dependencies.workspaces.apply_patch(
-            state["baseline_workspace"], str(fix["regression_test_patch"])
+        regression_patch = str(fix["regression_test_patch"])
+        applied = (
+            await dependencies.workspaces.apply_patch(state["baseline_workspace"], regression_patch)
+            if regression_patch
+            else True
         )
         if not applied:
             return {
@@ -280,11 +459,16 @@ def build_graph(dependencies: GraphDependencies) -> Any:
 
     async def run_candidate_validation(state: AnalysisState) -> dict[str, Any]:
         fix = state["candidate_fix"]
+        regression_patch = str(fix["regression_test_patch"])
         source_applied = await dependencies.workspaces.apply_patch(
             state["candidate_workspace"], str(fix["patch"])
         )
-        test_applied = await dependencies.workspaces.apply_patch(
-            state["candidate_workspace"], str(fix["regression_test_patch"])
+        test_applied = (
+            await dependencies.workspaces.apply_patch(
+                state["candidate_workspace"], regression_patch
+            )
+            if regression_patch
+            else True
         )
         if not (source_applied and test_applied):
             return {
@@ -316,7 +500,7 @@ def build_graph(dependencies: GraphDependencies) -> Any:
 
     async def evaluate_acceptance_criteria(state: AnalysisState) -> dict[str, Any]:
         criteria = state["request"].get("acceptance_criteria", [])
-        suite_passed = state.get("candidate_validation", {}).get("suite_passed")
+        suite_passed = state.get("original_validation", {}).get("suite_passed")
         evaluations = evaluate_acceptance(
             tuple(
                 AcceptanceCriterion(
@@ -346,9 +530,26 @@ def build_graph(dependencies: GraphDependencies) -> Any:
         }
 
     async def apply_quality_gate(state: AnalysisState) -> dict[str, Any]:
-        validation = state.get("candidate_validation", {})
+        original_validation = state.get("original_validation", {})
+        candidate_validation = state.get("candidate_validation", {})
         baseline = state.get("baseline_validation", {})
-        criteria = state.get("acceptance_results", [])
+        criteria = state.get("acceptance_results")
+        if criteria is None:
+            reason = "Omitido porque el análisis no alcanzó la validación de criterios."
+            if state.get("secret_scan", {}).get("detected"):
+                reason = "Omitido porque se detectó un secreto potencial en el cambio."
+            criteria = [
+                {
+                    "id": str(item["id"]),
+                    "text": str(item["text"]),
+                    "required": bool(item.get("required", True)),
+                    "status": "NOT_EVALUATED",
+                    "evidence": [],
+                    "source": "NOT_EXECUTED",
+                    "reason": reason,
+                }
+                for item in state.get("request", {}).get("acceptance_criteria", [])
+            ]
         required = [item for item in criteria if item["required"]]
         analysis = state.get("analysis_output", {})
         critical = sum(
@@ -368,19 +569,21 @@ def build_graph(dependencies: GraphDependencies) -> Any:
         decision = evaluate_quality_gate(
             GateFacts(
                 head_sha_current=sha_current,
-                context_complete=bool(state.get("context_complete")) if snapshot else None,
-                tests_executed=validation.get("tests_executed"),
-                tests_passed=validation.get("suite_passed"),
+                context_complete=state.get("context_complete")
+                if "context_complete" in state
+                else None,
+                tests_executed=original_validation.get("tests_executed"),
+                tests_passed=original_validation.get("suite_passed"),
                 critical_findings=critical,
                 secrets_detected=state.get("secret_scan", {}).get("detected"),
                 required_criteria_evaluated=all(
                     item["status"] != "NOT_EVALUATED" for item in required
                 ),
                 required_criteria_passed=all(item["status"] == "PASSED" for item in required),
-                patch_applied=validation.get("patch_applied"),
+                patch_applied=candidate_validation.get("patch_applied"),
                 regression_reproduced=baseline.get("reproduced"),
-                regression_fixed=validation.get("regression_fixed"),
-                suite_passed=validation.get("suite_passed"),
+                regression_fixed=candidate_validation.get("regression_fixed"),
+                suite_passed=candidate_validation.get("suite_passed"),
                 business_logic_changed=bool(analysis.get("findings")),
                 tests_changed=bool(state.get("candidate_fix")),
                 pr_is_draft=bool(state.get("pr_snapshot", {}).get("draft", False)),
@@ -388,7 +591,7 @@ def build_graph(dependencies: GraphDependencies) -> Any:
                 evidence_by_rule=(
                     ("GATE-001", ("github:head-sha",)),
                     ("GATE-015", ("github:head-sha",)),
-                    ("GATE-003", ("validation:candidate-suite",)),
+                    ("GATE-003", ("validation:pr-suite",)),
                     (
                         "GATE-007",
                         tuple(
@@ -398,21 +601,50 @@ def build_graph(dependencies: GraphDependencies) -> Any:
                 ),
             )
         )
+
+        def rule_data(rule: Any) -> dict[str, Any]:
+            return {
+                "id": rule.rule_id,
+                "outcome": str(rule.outcome),
+                "message": rule.message,
+                "evidence_ids": list(rule.evidence_ids),
+            }
+
+        secret_detected = bool(state.get("secret_scan", {}).get("detected"))
+        required_actions = list(decision.required_actions)
+        if secret_detected:
+            required_actions = [
+                "Retirar el secreto potencial del cambio.",
+                "Rotar o revocar el secreto si corresponde a una credencial real.",
+                "Actualizar el PR y ejecutar un nuevo análisis.",
+            ]
+        elif analysis.get("findings"):
+            required_actions = [
+                "Revisar o aplicar la corrección propuesta al PR.",
+                "Actualizar el PR y ejecutar un nuevo análisis sobre el nuevo SHA.",
+            ]
+        candidate_status = (
+            "VALIDATED"
+            if candidate_validation.get("patch_applied")
+            and candidate_validation.get("regression_fixed")
+            and candidate_validation.get("suite_passed")
+            else "FAILED"
+            if candidate_validation
+            else "NOT_PROPOSED"
+        )
         return {
+            "acceptance_results": criteria,
             "gate_decision": {
                 "status": str(decision.status),
                 "summary": decision.summary,
                 "policy_version": decision.policy_version,
-                "rules": [
-                    {
-                        "id": rule.rule_id,
-                        "outcome": str(rule.outcome),
-                        "message": rule.message,
-                        "evidence_ids": list(rule.evidence_ids),
-                    }
-                    for rule in decision.rules
-                ],
+                "rules": [rule_data(rule) for rule in decision.rules],
+                "blocking_reasons": [rule_data(rule) for rule in decision.blocking_reasons],
+                "warnings": [rule_data(rule) for rule in decision.warnings],
+                "not_evaluated_rules": [rule_data(rule) for rule in decision.not_evaluated_rules],
+                "required_actions": required_actions,
             },
+            "candidate_validation": {**candidate_validation, "status": candidate_status},
             **_event("apply_quality_gate", "Política determinística aplicada."),
         }
 
@@ -441,9 +673,11 @@ def build_graph(dependencies: GraphDependencies) -> Any:
         return "prepare_workspaces"
 
     def after_scan(state: AnalysisState) -> str:
+        if not _workspaces_ready(state):
+            return "apply_quality_gate"
         if state.get("secret_scan", {}).get("detected"):
             return "apply_quality_gate"
-        return "analyze_change"
+        return "run_original_validation"
 
     def after_analysis(state: AnalysisState) -> str:
         if state.get("errors"):
@@ -454,14 +688,18 @@ def build_graph(dependencies: GraphDependencies) -> Any:
     def after_patch_validation(state: AnalysisState) -> str:
         if state.get("patch_valid"):
             return "run_baseline_regression"
+        if int(state.get("fix_attempts", 0)) < 2:
+            return "generate_candidate_fix"
         return "evaluate_acceptance_criteria"
 
     graph = StateGraph(AnalysisState)
     graph.add_node("validate_request", validate_request)
     graph.add_node("fetch_pull_request", fetch_pull_request)
     graph.add_node("prepare_workspaces", prepare_workspaces)
+    graph.add_node("route_after_prepare", route_after_prepare)
     graph.add_node("build_context", build_context_node)
     graph.add_node("scan_context", scan_context)
+    graph.add_node("run_original_validation", run_original_validation)
     graph.add_node("analyze_change", analyze_change)
     graph.add_node("generate_candidate_fix", generate_candidate_fix)
     graph.add_node("validate_patch_shape", validate_patch_shape_node)
@@ -474,9 +712,10 @@ def build_graph(dependencies: GraphDependencies) -> Any:
     graph.add_edge(START, "validate_request")
     graph.add_conditional_edges("validate_request", after_validation)
     graph.add_conditional_edges("fetch_pull_request", after_fetch)
-    graph.add_edge("prepare_workspaces", "build_context")
+    graph.add_edge("prepare_workspaces", "route_after_prepare")
     graph.add_edge("build_context", "scan_context")
     graph.add_conditional_edges("scan_context", after_scan)
+    graph.add_edge("run_original_validation", "analyze_change")
     graph.add_conditional_edges("analyze_change", after_analysis)
     graph.add_edge("generate_candidate_fix", "validate_patch_shape")
     graph.add_conditional_edges("validate_patch_shape", after_patch_validation)

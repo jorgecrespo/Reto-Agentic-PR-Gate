@@ -15,8 +15,8 @@ def _result(facts: GateFacts, rule_id: str, value: bool | None, message: str) ->
     )
 
 
-def evaluate_quality_gate(facts: GateFacts, policy_version: str = "1.0.0") -> GateDecision:
-    """Evaluate only verified facts; unknown mandatory controls take precedence."""
+def evaluate_quality_gate(facts: GateFacts, policy_version: str = "1.0.1") -> GateDecision:
+    """Evaluate only verified facts; detected secrets override unknown later controls."""
     rules = (
         _result(
             facts,
@@ -70,18 +70,23 @@ def evaluate_quality_gate(facts: GateFacts, policy_version: str = "1.0.0") -> Ga
         ),
     )
     inconclusive_failure_rules = {"GATE-001", "GATE-002", "GATE-003", "GATE-007", "GATE-015"}
-    mandatory_unknown = any(rule.outcome is RuleOutcome.UNKNOWN for rule in rules[:12])
+    # The PR-to-QA decision uses evidence from the current PR. Candidate-patch
+    # rules remain reportable validation evidence and never approve this PR.
+    mandatory_unknown = any(rule.outcome is RuleOutcome.UNKNOWN for rule in rules[:8])
     mandatory_fail = any(
         rule.outcome is RuleOutcome.FAIL and rule.rule_id not in inconclusive_failure_rules
-        for rule in rules[:12]
+        for rule in rules[:8]
     )
+    secret_failure = rules[5].outcome is RuleOutcome.FAIL
     conditional_fail = any(rule.outcome is RuleOutcome.FAIL for rule in rules[12:14])
     inconclusive_fail = any(
         rule.outcome is RuleOutcome.FAIL and rule.rule_id in inconclusive_failure_rules
         for rule in rules
     )
     newer_revision_unknown = rules[14].outcome is RuleOutcome.UNKNOWN
-    if mandatory_unknown or inconclusive_fail or newer_revision_unknown:
+    if secret_failure:
+        status, summary = DecisionStatus.BLOCKED, "Se detectó un secreto potencial en el cambio."
+    elif mandatory_unknown or inconclusive_fail or newer_revision_unknown:
         status, summary = (
             DecisionStatus.INCONCLUSIVE,
             "Falta evidencia para evaluar controles obligatorios.",

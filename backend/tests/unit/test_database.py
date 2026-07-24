@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -5,6 +6,7 @@ from sqlalchemy import inspect, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from pr_gate.graph.runtime import RuntimeRepository
 from pr_gate.infrastructure.database import AnalysisStore, ValidationRecord
 from pr_gate.infrastructure.runner import CommandResult
 
@@ -83,11 +85,71 @@ def test_persists_incremental_report_entities(tmp_path: Path) -> None:
 def test_redacts_secrets_from_persisted_report(tmp_path: Path) -> None:
     store = AnalysisStore(f"sqlite:///{tmp_path / 'redacted.db'}")
     analysis = store.create("https://github.com/acme/shop/pull/1", "openai-small", "python-demo")
-    store.finish(analysis.id, "INCONCLUSIVE", {"output": "api_key=abcdefghijklmnop"})
+    store.finish(
+        analysis.id,
+        "INCONCLUSIVE",
+        {"output": "api_key=abcdefghijklmnop"},
+        input_tokens=12,
+        output_tokens=4,
+        estimated_cost=0.02,
+    )
     saved = store.get(analysis.id)
     assert saved is not None
     assert "abcdefghijklmnop" not in saved.report_json
     assert "[REDACTED_SECRET]" in saved.report_json
+    assert saved.input_tokens == 12
+    assert saved.output_tokens == 4
+    assert saved.estimated_cost == 0.02
+
+
+@pytest.mark.asyncio
+async def test_persists_actionable_report_without_secret_value(tmp_path: Path) -> None:
+    store = AnalysisStore(f"sqlite:///{tmp_path / 'actionable.db'}")
+    analysis = store.create("https://github.com/acme/shop/pull/1", "openai-small", "python-demo")
+    state = {
+        "analysis_id": analysis.id,
+        "pr_snapshot": {
+            "url": analysis.pull_request_url,
+            "title": "Secret leaked",
+            "draft": False,
+            "base_sha": "a" * 40,
+            "head_sha": "b" * 40,
+            "files": [{"filename": "app/domain.py"}],
+        },
+        "secret_scan": {"detected": True},
+        "secret_evidence": [
+            {"path": "app/domain.py", "start_line": 4, "end_line": 4, "kinds": ["secret"]}
+        ],
+        "acceptance_results": [
+            {
+                "id": "AC-1",
+                "text": "Price is safe",
+                "required": True,
+                "status": "NOT_EVALUATED",
+                "evidence": [],
+                "reason": "Omitido por secreto.",
+            }
+        ],
+        "gate_decision": {
+            "status": "BLOCKED",
+            "policy_version": "1.0.1",
+            "summary": "Se detectó un secreto potencial en el cambio.",
+            "rules": [{"id": "GATE-006", "message": "No deben detectarse secretos."}],
+            "not_evaluated_rules": [
+                {"id": "GATE-003", "message": "Los tests obligatorios deben ejecutarse."}
+            ],
+        },
+    }
+
+    await RuntimeRepository(store).persist(state)  # type: ignore[arg-type]
+
+    saved = store.get(analysis.id)
+    assert saved is not None
+    report = json.loads(saved.report_json)
+    assert report["pull_request"]["head_sha"] == "b" * 40
+    assert report["secret_evidence"][0]["path"] == "app/domain.py"
+    assert report["execution"]["llm"]["status"] == "NOT_EXECUTED"
+    assert "sk-test" not in saved.report_json
 
 
 def test_foreign_key_failure_rolls_back_validation(tmp_path: Path) -> None:

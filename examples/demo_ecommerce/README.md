@@ -8,3 +8,5 @@ El prototipo se prueba mediante URLs de pull request, no con una emulación loca
 
 Para reproducir un caso de demostración, cree un PR real en un fork y analícelo
 con su URL de GitHub.
+
+Ver `generar_PR.md` para las indicaciones de los 8 PR de demostración.

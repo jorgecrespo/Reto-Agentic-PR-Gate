@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -10,7 +11,7 @@ from pr_gate.infrastructure.config import ModelProfile
 from pr_gate.infrastructure.database import AnalysisStore
 from pr_gate.infrastructure.github import GitHubClient, PullRequestSnapshot
 from pr_gate.infrastructure.llm import OpenAILLMGateway
-from pr_gate.infrastructure.runner import DockerRunner
+from pr_gate.infrastructure.remote_runner import RemoteRunner
 from pr_gate.infrastructure.workspaces import WorkspaceManager, Workspaces
 
 
@@ -35,36 +36,14 @@ class RuntimeWorkspaces:
 
 class RuntimeRunner:
     def __init__(self, profile: Mapping[str, object]) -> None:
-        self._profile = profile
-        timeout_seconds = profile.get("timeout_seconds")
-        if not isinstance(timeout_seconds, int):
-            raise RuntimeError("El perfil de validación contiene un timeout inválido.")
-        self._runner = DockerRunner(timeout_seconds=timeout_seconds)
+        profile_id = profile.get("id")
+        if not isinstance(profile_id, str):
+            raise RuntimeError("El perfil de validación no tiene un ID válido.")
+        executor_url = os.environ.get("EXECUTOR_URL", "http://executor:8090")
+        self._runner = RemoteRunner(executor_url, profile_id)
 
     async def run(self, workspace: str, phase: str) -> dict[str, Any]:
-        command = self._command_for(phase)
-        result = await self._runner.run(Path(workspace), phase, command)
-        return {
-            "command_name": result.command_name,
-            "exit_code": result.exit_code,
-            "stdout": result.stdout,
-            "stderr": result.stderr,
-            "timed_out": result.timed_out,
-            "infrastructure_error": result.infrastructure_error,
-        }
-
-    def _command_for(self, phase: str) -> tuple[str, ...]:
-        if phase in {"baseline-regression", "candidate-regression"}:
-            configured = self._profile.get("regression_test_command", self._profile["test_command"])
-        elif phase == "candidate-suite":
-            configured = self._profile["test_command"]
-        else:
-            configured = self._profile["lint_command"]
-        if not isinstance(configured, list) or not all(
-            isinstance(value, str) for value in configured
-        ):
-            raise RuntimeError("El perfil de validación contiene un comando inválido.")
-        return tuple(configured)
+        return await self._runner.run(workspace, phase)
 
 
 class RuntimeRepository:
@@ -110,6 +89,25 @@ class RuntimeRepository:
                 [{"id": item} for item in evaluation["evidence"]],
             )
         decision = state["gate_decision"]
+        usage = state.get("llm_usage") or {}
+        secret_detected = bool(state.get("secret_scan", {}).get("detected"))
+        errors = state.get("errors", [])
+        first_error = errors[0]["message"] if errors else None
+        llm_executed = "analysis_output" in state
+        candidate_executed = "candidate_validation" in state
+        omission_reason = (
+            "Omitido porque se detectó un secreto potencial en el cambio."
+            if secret_detected
+            else first_error or "No hubo evidencia suficiente para ejecutar este control."
+        )
+        not_executed_controls = [
+            {
+                "id": rule["id"],
+                "label": rule["message"],
+                "reason": omission_reason,
+            }
+            for rule in decision["not_evaluated_rules"]
+        ]
         self._store.save_gate_decision(
             analysis_id,
             str(decision["status"]),
@@ -117,22 +115,58 @@ class RuntimeRepository:
             str(decision["summary"]),
             [{"rule_id": rule["id"], "message": rule["message"]} for rule in decision["rules"]],
         )
+        raw_input_tokens = usage.get("input_tokens")
+        raw_output_tokens = usage.get("output_tokens")
+        raw_cost = usage.get("estimated_cost")
+        input_tokens = raw_input_tokens if isinstance(raw_input_tokens, int) else None
+        output_tokens = raw_output_tokens if isinstance(raw_output_tokens, int) else None
+        estimated_cost = float(raw_cost) if isinstance(raw_cost, int | float) else None
         self._store.finish(
             analysis_id,
             str(decision["status"]),
             {
                 "analysis_id": analysis_id,
                 "head_sha": snapshot.get("head_sha") if snapshot else None,
+                "pull_request": {
+                    "url": snapshot.get("url") if snapshot else None,
+                    "title": snapshot.get("title") if snapshot else None,
+                    "base_sha": snapshot.get("base_sha") if snapshot else None,
+                    "head_sha": snapshot.get("head_sha") if snapshot else None,
+                    "draft": snapshot.get("draft") if snapshot else None,
+                    "modified_files": [
+                        str(item.get("filename"))
+                        for item in snapshot.get("files", [])
+                        if isinstance(item, dict) and isinstance(item.get("filename"), str)
+                    ]
+                    if snapshot
+                    else [],
+                },
                 "decision": decision,
                 "findings": state.get("analysis_output"),
                 "fix": fix,
                 "validations": {
+                    "original": state.get("original_validation"),
                     "baseline": state.get("baseline_validation"),
                     "candidate": state.get("candidate_validation"),
                 },
                 "acceptance_criteria": state.get("acceptance_results", []),
-                "errors": state.get("errors", []),
+                "secret_evidence": state.get("secret_evidence", []),
+                "execution": {
+                    "llm": {
+                        "status": "EXECUTED" if llm_executed else "NOT_EXECUTED",
+                        "reason": None if llm_executed else omission_reason,
+                    },
+                    "candidate_validation": {
+                        "status": "EXECUTED" if candidate_executed else "NOT_EXECUTED",
+                        "reason": None if candidate_executed else omission_reason,
+                    },
+                    "not_executed_controls": not_executed_controls,
+                },
+                "errors": errors,
             },
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            estimated_cost=estimated_cost,
         )
 
 

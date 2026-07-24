@@ -330,6 +330,15 @@
  - [x] decisión BLOCKED.
  - [x] decisión INCONCLUSIVE.
  - [x] evidencia.
+
+## T-057b — Completar informe accionable
+
+ - [x] trazabilidad de URL, SHA base y SHA analizado.
+ - [x] acciones requeridas y evidencia por regla.
+ - [x] controles omitidos con causa.
+ - [x] evidencia de secretos redactada.
+ - [x] explicación de métricas no aplicables.
+ - [x] pruebas backend y frontend.
  - [x] flujo E2E simulado.
 
 ### Milestone M5

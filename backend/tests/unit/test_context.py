@@ -27,3 +27,5 @@ def test_context_is_line_numbered_redacted_and_treats_code_as_data() -> None:
     assert bundle.secrets_detected
     assert bundle.excluded
     assert bundle.evidence[0].content_hash
+    assert bundle.secret_evidence[0].path == "app/a.py"
+    assert bundle.secret_evidence[0].kinds == ("token",)

@@ -1,6 +1,9 @@
 FROM python:3.12-slim
 
 WORKDIR /app
+RUN apt-get update \
+    && apt-get install --no-install-recommends --yes git \
+    && rm -rf /var/lib/apt/lists/*
 RUN pip install --no-cache-dir uv==0.11.7
 COPY backend/pyproject.toml backend/uv.lock ./
 RUN uv sync --frozen --no-dev

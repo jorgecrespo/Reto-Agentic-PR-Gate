@@ -6,7 +6,7 @@ import { App } from "./app";
 
 const blocked = {
   id: "analysis-1", status: "BLOCKED", error: null, created_at: "2026-01-01T00:00:00Z", finished_at: "2026-01-01T00:00:01Z", duration_ms: 1200, input_tokens: null, output_tokens: null, estimated_cost: null, model_profile_id: "openai-small", validation_profile_id: "python-demo",
-  report: { decision: { status: "BLOCKED", summary: "Existe un bloqueo verificable.", policy_version: "1.0.0", rules: [{ id: "GATE-005", outcome: "FAIL", message: "Hallazgo crítico." }] }, findings: { findings: [{ title: "Precio controlado", category: "security", severity: "critical", file_path: "app/orders.py", start_line: 18, end_line: 18, evidence_excerpt: "total += item.unit_price", explanation: "Confía en el cliente.", impact: "Permite alterar precios.", recommended_action: "Usar catálogo.", confidence: 0.98 }] }, fix: { summary: "Usar catálogo", patch: "diff --git a/app/orders.py", regression_test_patch: "diff --git a/tests/test_orders.py", modified_paths: ["app/orders.py"], assumptions: [] }, validations: { baseline: { result: { exit_code: 1, stderr: "assertion failed" } }, candidate: { results: [{ exit_code: 0, stdout: "passed" }] } }, acceptance_criteria: [{ id: "AC-1", text: "El precio es vigente", required: true, status: "FAILED", evidence: ["baseline"] }] },
+  report: { pull_request: { url: "https://github.com/acme/shop/pull/1", title: "Bloqueo de precio", base_sha: "a".repeat(40), head_sha: "b".repeat(40), draft: false, modified_files: ["app/orders.py"] }, decision: { status: "BLOCKED", summary: "Existe un bloqueo verificable.", policy_version: "1.0.1", rules: [{ id: "GATE-005", outcome: "FAIL", message: "Hallazgo crítico.", evidence_ids: ["finding-1"] }], required_actions: ["Aplicar la corrección propuesta y repetir la suite."] }, findings: { findings: [{ title: "Precio controlado", category: "security", severity: "critical", file_path: "app/orders.py", start_line: 18, end_line: 18, evidence_excerpt: "total += item.unit_price", explanation: "Confía en el cliente.", impact: "Permite alterar precios.", recommended_action: "Usar catálogo.", confidence: 0.98 }] }, fix: { summary: "Usar catálogo", patch: "diff --git a/app/orders.py", regression_test_patch: "diff --git a/tests/test_orders.py", modified_paths: ["app/orders.py"], assumptions: [] }, validations: { baseline: { result: { exit_code: 1, stderr: "assertion failed" } }, candidate: { results: [{ exit_code: 0, stdout: "passed" }] } }, acceptance_criteria: [{ id: "AC-1", text: "El precio es vigente", required: true, status: "FAILED", evidence: ["baseline"] }] },
 };
 
 function response(body: unknown) { return Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } })); }
@@ -43,6 +43,26 @@ describe("frontend vertical slice", () => {
     expect(await screen.findByText("BLOCKED")).toBeInTheDocument();
     expect(screen.getByText("total += item.unit_price")).toBeInTheDocument();
     expect(screen.getByText("GATE-005")).toBeInTheDocument();
+    expect(screen.getByText("Resumen del PR")).toBeInTheDocument();
+    expect(screen.getByText("Aplicar la corrección propuesta y repetir la suite.")).toBeInTheDocument();
+  });
+
+  it("explains a secret block without exposing its value", async () => {
+    const secretBlocked = {
+      ...blocked,
+      report: {
+        ...blocked.report,
+        decision: { ...blocked.report.decision, summary: "Se detectó un secreto potencial en el cambio.", required_actions: ["Retirar el secreto potencial del cambio."] },
+        secret_evidence: [{ path: "app/domain.py", start_line: 4, end_line: 4, kinds: ["demo_secret"] }],
+        execution: { llm: { status: "NOT_EXECUTED", reason: "Omitido porque se detectó un secreto potencial en el cambio." }, candidate_validation: { status: "NOT_EXECUTED", reason: "Omitido porque se detectó un secreto potencial en el cambio." }, not_executed_controls: [{ id: "GATE-003", label: "Los tests obligatorios deben ejecutarse.", reason: "Omitido porque se detectó un secreto potencial en el cambio." }] },
+      },
+    };
+    vi.stubGlobal("fetch", vi.fn(() => response(secretBlocked)));
+    renderApp("/analyses/analysis-1");
+    expect(await screen.findByText("Secretos detectados")).toBeInTheDocument();
+    expect(screen.getByText("LLM no ejecutado: Omitido porque se detectó un secreto potencial en el cambio.")).toBeInTheDocument();
+    expect(screen.getByText("Retirar el secreto potencial del cambio.")).toBeInTheDocument();
+    expect(screen.queryByText("sk-test-1234567890abcdef")).not.toBeInTheDocument();
   });
 
   it("explains INCONCLUSIVE without presenting it as ready", async () => {

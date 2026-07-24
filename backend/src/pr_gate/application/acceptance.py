@@ -27,12 +27,18 @@ def evaluate_acceptance_criteria(
     evidence_ids: tuple[str, ...],
 ) -> tuple[AcceptanceEvaluation, ...]:
     """Tests establish only that explicitly supplied criteria were evaluated by validation."""
-    status = AcceptanceStatus.PASSED if suite_passed is True else AcceptanceStatus.NOT_EVALUATED
+    status = (
+        AcceptanceStatus.PASSED
+        if suite_passed is True
+        else AcceptanceStatus.FAILED
+        if suite_passed is False
+        else AcceptanceStatus.NOT_EVALUATED
+    )
     return tuple(
         AcceptanceEvaluation(
             criterion.id,
             status,
-            evidence_ids if status is AcceptanceStatus.PASSED else (),
+            evidence_ids if status is not AcceptanceStatus.NOT_EVALUATED else (),
             "validation",
         )
         for criterion in criteria

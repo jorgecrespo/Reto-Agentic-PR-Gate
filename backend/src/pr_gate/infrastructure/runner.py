@@ -70,6 +70,16 @@ class DockerRunner:
             stdout, stderr = await asyncio.wait_for(
                 process.communicate(), timeout=self._timeout_seconds
             )
+        except FileNotFoundError:
+            return CommandResult(
+                command_name,
+                None,
+                "",
+                "No se pudo iniciar el executor Docker.",
+                False,
+                True,
+                "INFRASTRUCTURE_ERROR",
+            )
         except TimeoutError:
             process.kill()
             await process.wait()

@@ -35,7 +35,14 @@ class AnalysisRepository(Protocol):
     def list(self, limit: int = 50, offset: int = 0) -> list[StoredAnalysis]: ...
 
     def finish(
-        self, analysis_id: str, status: str, report: Mapping[str, object], error: str | None = None
+        self,
+        analysis_id: str,
+        status: str,
+        report: Mapping[str, object],
+        error: str | None = None,
+        input_tokens: int | None = None,
+        output_tokens: int | None = None,
+        estimated_cost: float | None = None,
     ) -> None: ...
 
     def events(self, analysis_id: str) -> Sequence[StoredEvent]: ...

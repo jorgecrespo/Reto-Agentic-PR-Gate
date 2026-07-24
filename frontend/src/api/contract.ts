@@ -13,19 +13,23 @@ export interface CreateAnalysisRequest {
 }
 export interface AnalysisCreated { analysis_id: string; status: DecisionStatus; deduplicated: boolean }
 export interface RunEvent { sequence: number; node: string; message: string; created_at?: string }
-export interface Rule { id: string; outcome: RuleOutcome; message: string }
+export interface Rule { id: string; outcome: RuleOutcome; message: string; evidence_ids?: string[] }
 export interface Finding {
   title: string; category: string; severity: string; file_path: string; start_line: number; end_line: number;
   evidence_excerpt: string; explanation: string; impact: string; recommended_action: string; confidence: number;
 }
 export interface Fix { summary: string; patch: string; regression_test_patch: string; modified_paths: string[]; assumptions: string[] }
 export interface ValidationResult { command_name?: string; exit_code?: number | null; stdout?: string; stderr?: string; timed_out?: boolean; infrastructure_error?: boolean }
-export interface CriterionResult { id: string; text: string; required: boolean; status: string; evidence: string[] }
-export interface Decision { status: DecisionStatus; summary: string; policy_version: string; rules: Rule[] }
+export interface CriterionResult { id: string; text: string; required: boolean; status: string; evidence: string[]; reason?: string }
+export interface PullRequestSummary { url?: string | null; title?: string | null; base_sha?: string | null; head_sha?: string | null; draft?: boolean | null; modified_files: string[] }
+export interface SecretEvidence { path: string; start_line: number; end_line: number; kinds: string[] }
+export interface NotExecutedControl { id: string; label: string; reason: string }
+export interface ExecutionSummary { llm?: { status: "EXECUTED" | "NOT_EXECUTED"; reason?: string | null }; candidate_validation?: { status: "EXECUTED" | "NOT_EXECUTED"; reason?: string | null }; not_executed_controls?: NotExecutedControl[] }
+export interface Decision { status: DecisionStatus; summary: string; policy_version: string; rules: Rule[]; blocking_reasons?: Rule[]; warnings?: Rule[]; not_evaluated_rules?: Rule[]; required_actions?: string[] }
 export interface AnalysisReport {
   analysis_id?: string; head_sha?: string | null; decision?: Decision; findings?: { summary?: string; findings?: Finding[] };
-  fix?: Fix | null; validations?: { baseline?: { result?: ValidationResult; reproduced?: boolean | null }; candidate?: { results?: ValidationResult[]; regression_fixed?: boolean | null; suite_passed?: boolean | null } };
-  acceptance_criteria?: CriterionResult[]; errors?: { code: string; message: string }[]; limitations?: string[];
+  fix?: Fix | null; validations?: { original?: { results?: ValidationResult[]; suite_passed?: boolean | null }; baseline?: { result?: ValidationResult; reproduced?: boolean | null }; candidate?: { status?: "VALIDATED" | "FAILED" | "NOT_PROPOSED"; results?: ValidationResult[]; regression_fixed?: boolean | null; suite_passed?: boolean | null } };
+  pull_request?: PullRequestSummary; acceptance_criteria?: CriterionResult[]; secret_evidence?: SecretEvidence[]; execution?: ExecutionSummary; errors?: { code: string; message: string }[]; limitations?: string[];
 }
 export interface Analysis { id: string; status: DecisionStatus; report: AnalysisReport; error: string | null; created_at: string; finished_at: string | null; duration_ms: number | null; input_tokens: number | null; output_tokens: number | null; estimated_cost: number | null; model_profile_id: string; validation_profile_id: string }
 export interface HistoryItem { id: string; pull_request_url: string; status: DecisionStatus; model_profile_id: string; head_sha: string | null; created_at: string; duration_ms: number | null }

@@ -13,6 +13,17 @@ resultados. El ejemplo de e-commerce en `examples/demo_ecommerce/` sirve como
 base de código para PRs de GitHub; la única forma de probar el prototipo es con
 una URL de PR de GitHub.
 
+## Qué entrega un análisis
+
+El informe explica la decisión, no solo el estado final. Incluye la trazabilidad
+del PR y SHA analizado, hallazgos con evidencia, corrección y test propuestos
+cuando aplican, resultados de validación, reglas del gate, controles omitidos y
+acciones necesarias para avanzar.
+
+Los secretos nunca se muestran: el informe solo conserva evidencia segura como
+archivo, línea y tipo de patrón. Cuando el LLM o el runner no se ejecutan, el
+informe indica la causa; en ese caso no presenta tokens o costo como disponibles.
+
 ## Requisitos
 
 - Python 3.12 y `uv`.
@@ -46,9 +57,11 @@ La UI queda en `http://localhost:5173` y la API en `http://localhost:8000`.
 ./scripts/run.sh
 ```
 
-Compose construye backend, frontend y la imagen de runner. Backend y runner
-corren como usuarios no root; los servicios tienen filesystem de solo lectura
-donde aplica, capacidades Linux eliminadas, `no-new-privileges` y healthchecks.
+Compose construye backend, frontend, executor y la imagen de runner. El backend
+no monta el socket Docker. Solo el executor interno recibe archives efímeros y
+monta ese socket para crear el runner con red deshabilitada, usuario no root,
+filesystem de solo lectura y límites de recursos. El executor no publica puertos
+al host; los servicios tienen capacidades Linux eliminadas y `no-new-privileges`.
 El volumen `pr-gate-data` conserva SQLite. `./scripts/cleanup.sh` destruye ese
 volumen y por tanto los informes persistidos.
 

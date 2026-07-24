@@ -942,6 +942,14 @@ Mitigación: respetar `spec.md` y `tasks.md`; todo extra va a backlog.
 11. Mostrar caso `INCONCLUSIVE`.
 12. Cerrar con costo, privacidad, limitaciones y siguientes pasos.
 
+### 25.1 Contrato de informe accionable
+
+El informe debe permitir que una persona entienda qué ocurrió sin inspeccionar
+logs internos: trazabilidad del PR y SHA, decisión y reglas, evidencia segura,
+validaciones ejecutadas, controles omitidos con causa, acciones necesarias y
+métricas del LLM solo cuando el proveedor fue invocado. Para secretos, persistir
+solamente ubicación y categoría del patrón redactado.
+
 ---
 
 ## 26. Referencias técnicas oficiales

@@ -53,10 +53,10 @@ def test_tests_not_executed_is_inconclusive_not_blocked() -> None:
         ({"secrets_detected": True}, DecisionStatus.BLOCKED),
         ({"required_criteria_evaluated": False}, DecisionStatus.INCONCLUSIVE),
         ({"required_criteria_passed": False}, DecisionStatus.BLOCKED),
-        ({"patch_applied": False}, DecisionStatus.BLOCKED),
-        ({"regression_reproduced": False}, DecisionStatus.BLOCKED),
-        ({"regression_fixed": False}, DecisionStatus.BLOCKED),
-        ({"suite_passed": False}, DecisionStatus.BLOCKED),
+        ({"patch_applied": False}, DecisionStatus.READY),
+        ({"regression_reproduced": False}, DecisionStatus.READY),
+        ({"regression_fixed": False}, DecisionStatus.READY),
+        ({"suite_passed": False}, DecisionStatus.READY),
         (
             {"business_logic_changed": True, "tests_changed": False},
             DecisionStatus.CONDITIONAL,
@@ -81,6 +81,22 @@ def test_draft_is_conditional() -> None:
 
 def test_secret_blocks() -> None:
     assert evaluate_quality_gate(facts(secrets_detected=True)).status is DecisionStatus.BLOCKED
+
+
+def test_secret_blocks_when_later_controls_are_unknown() -> None:
+    decision = evaluate_quality_gate(
+        facts(
+            secrets_detected=True,
+            tests_executed=None,
+            tests_passed=None,
+            patch_applied=None,
+            regression_reproduced=None,
+            regression_fixed=None,
+            suite_passed=None,
+        )
+    )
+    assert decision.status is DecisionStatus.BLOCKED
+    assert decision.summary == "Se detectó un secreto potencial en el cambio."
 
 
 def test_required_criterion_not_evaluated_is_inconclusive() -> None:

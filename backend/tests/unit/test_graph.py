@@ -6,7 +6,12 @@ import pytest
 
 from pr_gate.application.models import AnalysisOutput, FindingOutput, FixOutput
 from pr_gate.domain.types import PullRequestRef
-from pr_gate.graph.builder import AnalysisState, GraphDependencies, build_graph
+from pr_gate.graph.builder import (
+    AnalysisState,
+    GraphDependencies,
+    _workspace_fix_context,
+    build_graph,
+)
 from pr_gate.infrastructure.github import PullRequestSnapshot
 
 
@@ -47,6 +52,9 @@ class FakeLLM:
     finding: bool = True
     severity: str = "critical"
     valid_patch: bool = True
+    usage: dict[str, int | float | None] | None = field(
+        default_factory=lambda: {"input_tokens": 11, "output_tokens": 7, "estimated_cost": 0.01}
+    )
 
     async def analyze(self, context: str) -> AnalysisOutput:
         findings = []
@@ -68,7 +76,7 @@ class FakeLLM:
             )
         return AnalysisOutput(summary="analysis", findings=findings)
 
-    async def propose_fix(self, context: str) -> FixOutput:
+    async def propose_fix(self, context: str, feedback: str | None = None) -> FixOutput:
         return FixOutput(
             finding_index=0,
             summary="fix",
@@ -91,8 +99,11 @@ class FakeLLM:
 class FakeWorkspaces:
     patch_applies: bool = True
     cleaned: bool = False
+    prepare_fails: bool = False
 
     async def prepare(self, snapshot: PullRequestSnapshot) -> tuple[str, str]:
+        if self.prepare_fails:
+            raise RuntimeError("No fue posible preparar el snapshot del PR.")
         return ("/tmp/baseline", "/tmp/candidate")
 
     async def apply_patch(self, workspace: str, patch: str) -> bool:
@@ -139,9 +150,10 @@ def dependencies(
     secret: bool = False,
     valid_patch: bool = True,
     infrastructure: bool = False,
+    prepare_fails: bool = False,
 ) -> tuple[GraphDependencies, FakeRepository, FakeWorkspaces, FakeEvents]:
     repository = FakeRepository()
-    workspaces = FakeWorkspaces()
+    workspaces = FakeWorkspaces(prepare_fails=prepare_fails)
     events = FakeEvents()
     return (
         GraphDependencies(
@@ -169,17 +181,38 @@ def request(url: str = "https://github.com/acme/shop/pull/1") -> AnalysisState:
     }
 
 
+def test_workspace_fix_context_includes_changed_files_and_existing_tests(tmp_path) -> None:
+    app = tmp_path / "app"
+    tests = tmp_path / "tests"
+    app.mkdir()
+    tests.mkdir()
+    (app / "orders.py").write_text("total = item.unit_price\n")
+    (tests / "test_orders.py").write_text("def test_catalog_price(): ...\n")
+
+    context = _workspace_fix_context(
+        {
+            "candidate_workspace": str(tmp_path),
+            "pr_snapshot": {"files": [{"filename": "app/orders.py"}]},
+        }
+    )
+
+    assert "<workspace_file path=app/orders.py>" in context
+    assert "<workspace_file path=tests/test_orders.py>" in context
+
+
 @pytest.mark.asyncio
 async def test_ready_workflow_uses_all_validation_nodes_and_persists() -> None:
     deps, repository, workspaces, events = dependencies(severity="low")
     result = await build_graph(deps).ainvoke(request())
     assert result["gate_decision"]["status"] == "READY"
+    assert result["llm_usage"] == {"input_tokens": 22, "output_tokens": 14, "estimated_cost": 0.02}
     assert [event["node"] for event in result["events"]] == [
         "validate_request",
         "fetch_pull_request",
         "prepare_workspaces",
         "build_context",
         "scan_context",
+        "run_original_validation",
         "analyze_change",
         "generate_candidate_fix",
         "validate_patch_shape",
@@ -191,6 +224,11 @@ async def test_ready_workflow_uses_all_validation_nodes_and_persists() -> None:
         "finalize",
     ]
     assert len(repository.persisted) == 1
+    assert repository.persisted[0]["llm_usage"] == {
+        "input_tokens": 22,
+        "output_tokens": 14,
+        "estimated_cost": 0.02,
+    }
     assert workspaces.cleaned
     assert events.published[-1] == ("analysis-1", "finalize")
 
@@ -199,7 +237,7 @@ async def test_ready_workflow_uses_all_validation_nodes_and_persists() -> None:
 async def test_no_finding_is_blocked_without_requesting_a_fix() -> None:
     deps, repository, workspaces, _ = dependencies(finding=False)
     result = await build_graph(deps).ainvoke(request())
-    assert result["gate_decision"]["status"] == "INCONCLUSIVE"
+    assert result["gate_decision"]["status"] == "READY"
     assert "candidate_fix" not in result
     assert len(repository.persisted) == 1
     assert workspaces.cleaned
@@ -209,7 +247,7 @@ async def test_no_finding_is_blocked_without_requesting_a_fix() -> None:
 async def test_invalid_patch_is_inconclusive_and_skips_runner() -> None:
     deps, _, _, _ = dependencies(valid_patch=False)
     result = await build_graph(deps).ainvoke(request())
-    assert result["gate_decision"]["status"] == "INCONCLUSIVE"
+    assert result["gate_decision"]["status"] == "BLOCKED"
     assert any(error["code"] == "INVALID_PATCH" for error in result["errors"])
 
 
@@ -219,7 +257,14 @@ async def test_secret_routing_skips_llm_and_candidate_validation() -> None:
     result = await build_graph(deps).ainvoke(request())
     assert result["secret_scan"]["detected"] is True
     assert "analysis_output" not in result
-    assert "candidate_validation" not in result
+    assert result["candidate_validation"]["status"] == "NOT_PROPOSED"
+    assert result["secret_evidence"] == [
+        {"path": "app/orders.py", "start_line": 1, "end_line": 1, "kinds": ["api_key"]}
+    ]
+    assert result["acceptance_results"][0]["status"] == "NOT_EVALUATED"
+    assert result["gate_decision"]["required_actions"][0] == (
+        "Retirar el secreto potencial del cambio."
+    )
 
 
 @pytest.mark.asyncio
@@ -229,6 +274,26 @@ async def test_github_failure_is_inconclusive() -> None:
     assert result["gate_decision"]["status"] == "INCONCLUSIVE"
     assert any(error["code"] == "GITHUB_UNAVAILABLE" for error in result["errors"])
     assert len(repository.persisted) == 1
+
+
+@pytest.mark.asyncio
+async def test_workspace_failure_short_circuits_before_context_and_llm() -> None:
+    deps, repository, workspaces, _ = dependencies(prepare_fails=True)
+    result = await build_graph(deps).ainvoke(request())
+    assert result["gate_decision"]["status"] == "INCONCLUSIVE"
+    assert [event["node"] for event in result["events"]] == [
+        "validate_request",
+        "fetch_pull_request",
+        "prepare_workspaces",
+        "build_context",
+        "scan_context",
+        "apply_quality_gate",
+        "persist_report",
+        "finalize",
+    ]
+    assert "llm_usage" not in result
+    assert len(repository.persisted) == 1
+    assert workspaces.cleaned
 
 
 @pytest.mark.asyncio

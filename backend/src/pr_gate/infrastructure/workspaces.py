@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from pr_gate.infrastructure.github import GitHubClient, GitHubError, PullRequestSnapshot
+from pr_gate.infrastructure.patches import rebase_hunk_positions
 
 
 class WorkspaceError(RuntimeError):
@@ -65,17 +66,27 @@ class WorkspaceManager:
         if not patch.strip():
             return False
         patch_file = workspace / ".pr-gate.patch"
-        patch_file.write_text(patch)
+        patch_file.write_text(rebase_hunk_positions(patch, workspace))
         try:
             check = await asyncio.create_subprocess_exec(
-                "git", "apply", "--check", str(patch_file), cwd=workspace
+                "git",
+                "apply",
+                "--check",
+                "--recount",
+                "--unidiff-zero",
+                str(patch_file),
+                cwd=workspace,
             )
             if await check.wait() != 0:
                 return False
             apply = await asyncio.create_subprocess_exec(
-                "git", "apply", str(patch_file), cwd=workspace
+                "git", "apply", "--recount", "--unidiff-zero", str(patch_file), cwd=workspace
             )
             return await apply.wait() == 0
+        except FileNotFoundError as error:
+            raise WorkspaceError(
+                "La herramienta de aplicación de parches no está disponible."
+            ) from error
         finally:
             patch_file.unlink(missing_ok=True)
 

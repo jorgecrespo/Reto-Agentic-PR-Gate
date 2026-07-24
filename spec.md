@@ -169,7 +169,8 @@ enabled: true
 ```yaml
 id: python-demo
 allowed_paths:
-  - examples/demo_ecommerce/**
+  - app/**
+  - tests/**
 test_command:
   - python
   - -m
@@ -178,7 +179,7 @@ test_command:
 lint_command:
   - ruff
   - check
-  - examples/demo_ecommerce
+  - .
 timeout_seconds: 120
 network_enabled: false
 ```
@@ -390,6 +391,7 @@ El informe muestra:
 
 - decisión;
 - resumen;
+- URL, título, SHA base y SHA analizado del PR;
 - hallazgo;
 - evidencia;
 - parche;
@@ -401,6 +403,11 @@ El informe muestra:
 - modelo y versión de política;
 - limitaciones;
 - acciones para desbloquear.
+
+Cada control no ejecutado debe indicar su causa. Si se detecta un secreto, el
+informe muestra únicamente archivo, línea y tipo de patrón redactado; no muestra
+el valor detectado. Si el LLM no se ejecutó, tokens y costo se reportan como no
+aplicables junto con el motivo determinístico.
 
 ### FR-019 — Historial
 
@@ -458,10 +465,11 @@ No hay evidencia suficiente para aprobar o bloquear de forma confiable, o falló
 
 ### 10.3 Precedencia
 
-1. `INCONCLUSIVE` por imposibilidad de evaluar una regla obligatoria.
-2. `BLOCKED` por incumplimiento comprobado.
-3. `CONDITIONAL` por advertencias aceptables.
-4. `READY` cuando no existe ninguna condición anterior.
+1. `BLOCKED` si `GATE-006` detecta un secreto, aunque controles posteriores no se ejecuten.
+2. `INCONCLUSIVE` por imposibilidad de evaluar una regla obligatoria.
+3. `BLOCKED` por otro incumplimiento comprobado.
+4. `CONDITIONAL` por advertencias aceptables.
+5. `READY` cuando no existe ninguna condición anterior.
 
 Una misma ejecución puede listar blockers y warnings, pero el estado sigue la precedencia definida.
 
@@ -713,16 +721,17 @@ Mostrar etapas:
 Secciones:
 
 1. Decisión y etapa objetivo.
-2. Resumen del PR.
+2. Resumen del PR: URL, título, SHA base, SHA analizado y estado draft.
 3. Hallazgos.
 4. Corrección propuesta.
 5. Test de regresión.
 6. Evidencia antes/después.
 7. Suite y herramientas.
 8. Criterios de aceptación.
-9. Política aplicada.
-10. Costo, tokens y duración.
-11. Limitaciones y acciones necesarias.
+9. Política aplicada con evidencia de cada regla.
+10. Controles no ejecutados y su causa.
+11. Costo, tokens y duración, o causa de no aplicación.
+12. Limitaciones y acciones necesarias.
 
 ### 16.4 Historial
 

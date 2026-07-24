@@ -1,9 +1,10 @@
 validation_profiles:
   - id: python-demo
     allowed_paths:
-      - examples/demo_ecommerce/**
+      - app/**
+      - tests/**
     test_command: ["python", "-m", "pytest", "-q"]
     regression_test_command: ["python", "-m", "pytest", "-q"]
-    lint_command: ["ruff", "check", "examples/demo_ecommerce"]
+    lint_command: ["ruff", "check", "."]
     timeout_seconds: 120
     network_enabled: false

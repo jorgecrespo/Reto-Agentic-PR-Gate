@@ -33,7 +33,7 @@ def test_exposes_only_safe_configuration() -> None:
     assert models["models"]
     assert "api_key_env" not in models["models"][0]
     assert profiles == {"validation_profiles": [{"id": "python-demo"}]}
-    assert policy["version"] == "1.0.0"
+    assert policy["version"] == "1.0.1"
 
 
 def test_missing_analysis_uses_problem_details() -> None:

@@ -2,6 +2,7 @@ import pytest
 
 from pr_gate.infrastructure.patches import (
     PatchValidationError,
+    normalize_hunk_counts,
     validate_patch,
     validate_patch_shape,
 )
@@ -30,3 +31,33 @@ def test_rejects_runner_configuration_and_secrets() -> None:
         validate_patch(PATCH.replace(PATH, "Dockerfile"), ("",))
     with pytest.raises(PatchValidationError, match="secreto"):
         validate_patch(PATCH + "+ api_key='abcdefghijklmnop'\n", ("examples/",))
+
+
+def test_rejects_hunk_with_incorrect_line_counts() -> None:
+    invalid = PATCH.replace("@@ -1 +1 @@", "@@ -1,7 +1,7 @@")
+
+    with pytest.raises(PatchValidationError, match="conteos"):
+        validate_patch(invalid, ("examples/demo_ecommerce/",))
+
+
+def test_normalizes_hunk_counts_without_changing_content() -> None:
+    invalid = PATCH.replace("@@ -1 +1 @@", "@@ -1,7 +1,7 @@")
+
+    normalized = normalize_hunk_counts(invalid)
+
+    assert "@@ -1,1 +1,1 @@" in normalized
+    assert "-old\n+new" in normalized
+    assert normalized.endswith("\n")
+    assert validate_patch(normalized, ("examples/demo_ecommerce/",)).paths == (PATH,)
+
+
+def test_normalization_preserves_empty_regression_patch() -> None:
+    assert normalize_hunk_counts("\n") == ""
+
+
+def test_normalization_adds_missing_context_prefix() -> None:
+    malformed = PATCH.replace("-old\n+new", "old\n-old\n+new")
+
+    normalized = normalize_hunk_counts(malformed)
+
+    assert " old\n-old\n+new" in normalized

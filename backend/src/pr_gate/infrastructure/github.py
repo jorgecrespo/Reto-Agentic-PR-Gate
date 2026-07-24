@@ -209,7 +209,10 @@ class GitHubClient:
         """Download a SHA-pinned archive only; extraction is handled by WorkspaceManager."""
         target.parent.mkdir(parents=True, exist_ok=True)
         async with httpx.AsyncClient(
-            headers=self._headers(), timeout=self._timeout, transport=self._transport
+            headers=self._headers(),
+            timeout=self._timeout,
+            transport=self._transport,
+            follow_redirects=True,
         ) as client:
             response = await self._request(
                 client,

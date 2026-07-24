@@ -74,7 +74,7 @@ class AnalysisRecord(Base):
     status: Mapped[str] = mapped_column(String(32), index=True)
     model_profile_id: Mapped[str] = mapped_column(String(100))
     validation_profile_id: Mapped[str] = mapped_column(String(100))
-    policy_version: Mapped[str] = mapped_column(String(32), default="1.0.0")
+    policy_version: Mapped[str] = mapped_column(String(32), default="1.0.1")
     prompt_version: Mapped[str] = mapped_column(String(32), default="v1")
     head_sha: Mapped[str | None] = mapped_column(String(64), nullable=True)
     report_json: Mapped[str] = mapped_column(Text, default="{}")
@@ -206,6 +206,9 @@ class AnalysisStore:
 
     def _upgrade_schema(self) -> None:
         config = Config(str(Path(__file__).resolve().parents[3] / "alembic.ini"))
+        config.set_main_option(
+            "script_location", str(Path(__file__).resolve().parents[3] / "migrations")
+        )
         config.set_main_option("sqlalchemy.url", self._url)
         try:
             command.upgrade(config, "head")
@@ -410,7 +413,14 @@ class AnalysisStore:
             return records
 
     def finish(
-        self, analysis_id: str, status: str, report: Mapping[str, object], error: str | None = None
+        self,
+        analysis_id: str,
+        status: str,
+        report: Mapping[str, object],
+        error: str | None = None,
+        input_tokens: int | None = None,
+        output_tokens: int | None = None,
+        estimated_cost: float | None = None,
     ) -> None:
         with Session(self._engine) as session:
             record = session.get(AnalysisRecord, analysis_id)
@@ -421,6 +431,9 @@ class AnalysisStore:
             record.head_sha = head_sha if isinstance(head_sha, str) else None
             record.report_json = _redact(json.dumps(report))
             record.error_message = error
+            record.input_tokens = input_tokens
+            record.output_tokens = output_tokens
+            record.estimated_cost = estimated_cost
             record.finished_at = datetime.now(UTC)
             started_at = record.started_at
             if started_at.tzinfo is None:

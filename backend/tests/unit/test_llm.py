@@ -1,8 +1,10 @@
+from types import SimpleNamespace
+
 import pytest
 from pydantic import ValidationError
 
-from pr_gate.application.models import AnalysisOutput, AnalysisPrompt, FixPrompt
-from pr_gate.infrastructure.llm import FakeLLMGateway, LLMError
+from pr_gate.application.models import AnalysisOutput, AnalysisPrompt, FixOutput, FixPrompt
+from pr_gate.infrastructure.llm import FakeLLMGateway, LLMError, OpenAILLMGateway
 
 
 def test_output_rejects_unknown_fields() -> None:
@@ -24,3 +26,63 @@ async def test_fake_gateway_uses_structured_contract() -> None:
         await gateway.propose_fix_for(
             FixPrompt(prompt_version="propose-fix-v1", context="data", finding_index=0)
         )
+
+
+@pytest.mark.asyncio
+async def test_openai_gateway_uses_sdk_pydantic_parse(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: dict[str, object] = {}
+    output = AnalysisOutput(summary="ok", findings=[])
+
+    class Responses:
+        async def parse(self, **kwargs: object) -> object:
+            calls.update(kwargs)
+            return SimpleNamespace(
+                output_parsed=output,
+                usage=SimpleNamespace(input_tokens=12, output_tokens=4),
+            )
+
+    client = SimpleNamespace(responses=Responses())
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr("pr_gate.infrastructure.llm.AsyncOpenAI", lambda **_: client)
+
+    gateway = OpenAILLMGateway()
+
+    assert await gateway.analyze("safe context") == output
+    assert calls["text_format"] is AnalysisOutput
+    assert gateway.usage is not None
+    assert gateway.usage.input_tokens == 12
+    assert gateway.usage.output_tokens == 4
+
+
+@pytest.mark.asyncio
+async def test_fix_prompt_requires_complete_git_diff(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: dict[str, object] = {}
+    fix = FixOutput(
+        finding_index=0,
+        summary="fix",
+        patch=(
+            "diff --git a/app/orders.py b/app/orders.py\n--- a/app/orders.py\n+++ b/app/orders.py\n"
+        ),
+        regression_test_patch=(
+            "diff --git a/tests/test_orders.py b/tests/test_orders.py\n"
+            "--- a/tests/test_orders.py\n"
+            "+++ b/tests/test_orders.py\n"
+        ),
+        modified_paths=["app/orders.py", "tests/test_orders.py"],
+    )
+
+    class Responses:
+        async def parse(self, **kwargs: object) -> object:
+            calls.update(kwargs)
+            return SimpleNamespace(output_parsed=fix, usage=None)
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(
+        "pr_gate.infrastructure.llm.AsyncOpenAI", lambda **_: SimpleNamespace(responses=Responses())
+    )
+
+    gateway = OpenAILLMGateway()
+    assert await gateway.propose_fix("safe context") == fix
+    assert "diff --git a/<path> b/<path>" in str(calls["input"])
+    assert "do not invent classes" in str(calls["input"])
+    assert "Set finding_index to 0" in str(calls["input"])

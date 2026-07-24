@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import io
+import zipfile
+from pathlib import Path
+
 import httpx
 import pytest
 
 from pr_gate.domain.types import PullRequestRef
-from pr_gate.infrastructure.github import GitHubClient, GitHubError
+from pr_gate.infrastructure.github import GitHubClient, GitHubError, PullRequestSnapshot
 
 
 def response(request: httpx.Request) -> httpx.Response:
@@ -63,3 +67,44 @@ async def test_missing_patch_is_inconclusive_error() -> None:
     client = GitHubClient(transport=httpx.MockTransport(missing_patch))
     with pytest.raises(GitHubError, match="diff no está íntegro"):
         await client.fetch_snapshot(PullRequestRef.parse("https://github.com/acme/shop/pull/1"))
+
+
+@pytest.mark.asyncio
+async def test_download_archive_follows_github_redirect(tmp_path: Path) -> None:
+    archive = io.BytesIO()
+    with zipfile.ZipFile(archive, "w") as zip_file:
+        zip_file.writestr("shop-abc/app.py", "print('ok')\n")
+
+    def archive_response(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "api.github.com":
+            return httpx.Response(
+                302,
+                headers={"location": "https://codeload.github.com/acme/shop/legacy.zip/abc"},
+                request=request,
+            )
+        if request.url.host == "codeload.github.com":
+            return httpx.Response(
+                200,
+                content=archive.getvalue(),
+                headers={"content-type": "application/zip"},
+                request=request,
+            )
+        return httpx.Response(404, request=request)
+
+    ref = PullRequestRef.parse("https://github.com/acme/shop/pull/1")
+    snapshot = PullRequestSnapshot(
+        ref=ref,
+        title="Change",
+        body="",
+        draft=False,
+        base_sha="a" * 40,
+        head_sha="b" * 40,
+        files=(),
+        clone_url="https://github.com/acme/shop.git",
+    )
+    target = tmp_path / "source.zip"
+    client = GitHubClient(transport=httpx.MockTransport(archive_response))
+
+    await client.download_archive(snapshot, target)
+
+    assert target.read_bytes() == archive.getvalue()
