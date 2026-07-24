@@ -8,16 +8,15 @@ def facts(**changes: object) -> GateFacts:
     values: dict[str, object] = {
         "head_sha_current": True,
         "context_complete": True,
+        "analysis_completed": True,
         "tests_executed": True,
         "tests_passed": True,
+        "lint_executed": True,
+        "lint_passed": True,
         "critical_findings": 0,
         "secrets_detected": False,
         "required_criteria_evaluated": True,
         "required_criteria_passed": True,
-        "patch_applied": True,
-        "regression_reproduced": True,
-        "regression_fixed": True,
-        "suite_passed": True,
         "business_logic_changed": False,
         "tests_changed": False,
         "pr_is_draft": False,
@@ -47,16 +46,15 @@ def test_tests_not_executed_is_inconclusive_not_blocked() -> None:
     [
         ({"head_sha_current": False}, DecisionStatus.INCONCLUSIVE),
         ({"context_complete": False}, DecisionStatus.INCONCLUSIVE),
+        ({"analysis_completed": False}, DecisionStatus.INCONCLUSIVE),
         ({"tests_executed": False}, DecisionStatus.INCONCLUSIVE),
         ({"tests_passed": False}, DecisionStatus.BLOCKED),
+        ({"lint_executed": False}, DecisionStatus.INCONCLUSIVE),
+        ({"lint_passed": False}, DecisionStatus.BLOCKED),
         ({"critical_findings": 1}, DecisionStatus.BLOCKED),
         ({"secrets_detected": True}, DecisionStatus.BLOCKED),
         ({"required_criteria_evaluated": False}, DecisionStatus.INCONCLUSIVE),
         ({"required_criteria_passed": False}, DecisionStatus.BLOCKED),
-        ({"patch_applied": False}, DecisionStatus.READY),
-        ({"regression_reproduced": False}, DecisionStatus.READY),
-        ({"regression_fixed": False}, DecisionStatus.READY),
-        ({"suite_passed": False}, DecisionStatus.READY),
         (
             {"business_logic_changed": True, "tests_changed": False},
             DecisionStatus.CONDITIONAL,
@@ -89,10 +87,6 @@ def test_secret_blocks_when_later_controls_are_unknown() -> None:
             secrets_detected=True,
             tests_executed=None,
             tests_passed=None,
-            patch_applied=None,
-            regression_reproduced=None,
-            regression_fixed=None,
-            suite_passed=None,
         )
     )
     assert decision.status is DecisionStatus.BLOCKED
@@ -104,6 +98,11 @@ def test_required_criterion_not_evaluated_is_inconclusive() -> None:
         evaluate_quality_gate(facts(required_criteria_evaluated=None)).status
         is DecisionStatus.INCONCLUSIVE
     )
+
+
+def test_blocking_failure_takes_precedence_over_missing_acceptance_evidence() -> None:
+    decision = evaluate_quality_gate(facts(tests_passed=False, required_criteria_evaluated=False))
+    assert decision.status is DecisionStatus.BLOCKED
 
 
 def test_rule_evidence_and_required_action_are_preserved() -> None:

@@ -44,15 +44,28 @@ def build_context(snapshot: PullRequestSnapshot, max_characters: int = 40_000) -
     return bundle.prompt, bundle.secrets_detected
 
 
+def _profile_prefixes(
+    profile: dict[str, Any], key: str, fallback: tuple[str, ...]
+) -> tuple[str, ...]:
+    paths = profile.get(key)
+    if not isinstance(paths, list) or not all(isinstance(path, str) for path in paths):
+        return fallback
+    return tuple(path.removesuffix("**") for path in paths)
+
+
 async def run_candidate_validation(
     snapshot: PullRequestSnapshot,
     fix: FixOutput,
     profile: dict[str, Any],
 ) -> ValidationEvidence:
     allowed = tuple(str(path).removesuffix("**") for path in profile["allowed_paths"])
+    source_allowed = _profile_prefixes(profile, "allowed_source_paths", allowed)
+    test_allowed = _profile_prefixes(profile, "allowed_test_paths", allowed)
     try:
-        validate_patch_shape(fix.patch, allowed)
-        validate_patch_shape(fix.regression_test_patch, allowed)
+        validate_patch_shape(fix.patch, source_allowed)
+        if not fix.regression_test_patch.strip():
+            raise PatchValidationError("La propuesta debe incluir un test de regresión.")
+        validate_patch_shape(fix.regression_test_patch, test_allowed)
     except PatchValidationError:
         return ValidationEvidence(None, None, None, None, False, None, None, None)
     manager = WorkspaceManager()

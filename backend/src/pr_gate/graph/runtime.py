@@ -5,12 +5,13 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from pr_gate.application.report import AnalysisReport
 from pr_gate.domain.types import PullRequestRef
-from pr_gate.graph.builder import AnalysisState, GraphDependencies, RunEvent, patch_hash
+from pr_gate.graph.builder import GraphDependencies, RunEvent, patch_hash
 from pr_gate.infrastructure.config import ModelProfile
 from pr_gate.infrastructure.database import AnalysisStore
 from pr_gate.infrastructure.github import GitHubClient, PullRequestSnapshot
-from pr_gate.infrastructure.llm import OpenAILLMGateway
+from pr_gate.infrastructure.llm import create_llm_gateway
 from pr_gate.infrastructure.remote_runner import RemoteRunner
 from pr_gate.infrastructure.workspaces import WorkspaceManager, Workspaces
 
@@ -50,10 +51,11 @@ class RuntimeRepository:
     def __init__(self, store: AnalysisStore) -> None:
         self._store = store
 
-    async def persist(self, state: AnalysisState) -> None:
-        analysis_id = state["analysis_id"]
-        snapshot = state.get("pr_snapshot")
-        if snapshot:
+    async def persist(self, report: AnalysisReport) -> None:
+        data = report.data
+        analysis_id = str(data["analysis_id"])
+        snapshot = data.get("pull_request")
+        if isinstance(snapshot, Mapping) and snapshot.get("url"):
             parsed = PullRequestRef.parse(str(snapshot["url"]))
             self._store.save_snapshot(
                 analysis_id,
@@ -64,22 +66,28 @@ class RuntimeRepository:
                 str(snapshot["base_sha"]),
                 str(snapshot["head_sha"]),
                 bool(snapshot["draft"]),
-                {"files": snapshot["files"]},
+                {"files": snapshot.get("modified_files", [])},
                 title=str(snapshot["title"]),
             )
         finding_ids: list[str] = []
-        for finding in state.get("analysis_output", {}).get("findings", []):
+        findings_payload = data.get("findings")
+        findings = (
+            findings_payload.get("findings", []) if isinstance(findings_payload, Mapping) else []
+        )
+        for finding in findings:
             finding_ids.append(self._store.save_finding(analysis_id, finding))
-        fix = state.get("candidate_fix")
-        if fix and finding_ids:
+        fix = data.get("fix")
+        if isinstance(fix, Mapping) and finding_ids:
             self._store.save_candidate_fix(
                 finding_ids[0],
                 str(fix["patch"]),
                 str(fix["regression_test_patch"]),
                 patch_hash(str(fix["patch"])),
-                "APPLICABLE" if state.get("patch_valid") else "INVALID",
+                "APPLICABLE",
             )
-        for evaluation in state.get("acceptance_results", []):
+        for evaluation in data.get("acceptance_criteria", []):
+            if not isinstance(evaluation, Mapping):
+                continue
             self._store.save_acceptance_evaluation(
                 analysis_id,
                 str(evaluation["id"]),
@@ -88,13 +96,18 @@ class RuntimeRepository:
                 str(evaluation["status"]),
                 [{"id": item} for item in evaluation["evidence"]],
             )
-        decision = state["gate_decision"]
-        usage = state.get("llm_usage") or {}
-        secret_detected = bool(state.get("secret_scan", {}).get("detected"))
-        errors = state.get("errors", [])
+        decision = data["decision"]
+        raw_usage = data.get("llm_usage")
+        usage: Mapping[str, Any] = raw_usage if isinstance(raw_usage, Mapping) else {}
+        secret_detected = bool(data.get("secret_evidence"))
+        errors = data.get("errors", [])
         first_error = errors[0]["message"] if errors else None
-        llm_executed = "analysis_output" in state
-        candidate_executed = "candidate_validation" in state
+        llm_executed = bool(data.get("findings"))
+        raw_validations = data.get("validations")
+        validations: Mapping[str, Any] = (
+            raw_validations if isinstance(raw_validations, Mapping) else {}
+        )
+        candidate_executed = bool(validations.get("candidate"))
         omission_reason = (
             "Omitido porque se detectó un secreto potencial en el cambio."
             if secret_detected
@@ -125,32 +138,8 @@ class RuntimeRepository:
             analysis_id,
             str(decision["status"]),
             {
-                "analysis_id": analysis_id,
-                "head_sha": snapshot.get("head_sha") if snapshot else None,
-                "pull_request": {
-                    "url": snapshot.get("url") if snapshot else None,
-                    "title": snapshot.get("title") if snapshot else None,
-                    "base_sha": snapshot.get("base_sha") if snapshot else None,
-                    "head_sha": snapshot.get("head_sha") if snapshot else None,
-                    "draft": snapshot.get("draft") if snapshot else None,
-                    "modified_files": [
-                        str(item.get("filename"))
-                        for item in snapshot.get("files", [])
-                        if isinstance(item, dict) and isinstance(item.get("filename"), str)
-                    ]
-                    if snapshot
-                    else [],
-                },
+                **data,
                 "decision": decision,
-                "findings": state.get("analysis_output"),
-                "fix": fix,
-                "validations": {
-                    "original": state.get("original_validation"),
-                    "baseline": state.get("baseline_validation"),
-                    "candidate": state.get("candidate_validation"),
-                },
-                "acceptance_criteria": state.get("acceptance_results", []),
-                "secret_evidence": state.get("secret_evidence", []),
                 "execution": {
                     "llm": {
                         "status": "EXECUTED" if llm_executed else "NOT_EXECUTED",
@@ -184,17 +173,30 @@ class StoreEventPublisher:
 def build_runtime_dependencies(
     store: AnalysisStore, profile: Mapping[str, object], model_profile: ModelProfile | None = None
 ) -> GraphDependencies:
-    allowed_paths = profile.get("allowed_paths", [])
-    if not isinstance(allowed_paths, list) or not all(
-        isinstance(path, str) for path in allowed_paths
-    ):
-        raise RuntimeError("El perfil de validación contiene paths permitidos inválidos.")
+    allowed_paths = _profile_paths(profile, "allowed_paths")
+    source_paths = _profile_paths(profile, "allowed_source_paths")
+    test_paths = _profile_paths(profile, "allowed_test_paths")
     return GraphDependencies(
         pull_requests=GitHubClient(),
-        llm=OpenAILLMGateway(model_profile),
+        llm=create_llm_gateway(model_profile),
         workspaces=RuntimeWorkspaces(),
         runner=RuntimeRunner(profile),
         repository=RuntimeRepository(store),
         events=StoreEventPublisher(store),
-        allowed_patch_prefixes=tuple(path.removesuffix("**") for path in allowed_paths),
+        allowed_patch_prefixes=_prefixes_from_paths(allowed_paths),
+        allowed_source_patch_prefixes=_prefixes_from_paths(source_paths),
+        allowed_test_patch_prefixes=_prefixes_from_paths(test_paths),
     )
+
+
+def _profile_paths(profile: Mapping[str, object], key: str, *, required: bool = True) -> list[str]:
+    paths = profile.get(key, [])
+    if not isinstance(paths, list) or not all(isinstance(path, str) for path in paths):
+        if required:
+            raise RuntimeError("El perfil de validación contiene paths permitidos inválidos.")
+        return []
+    return paths
+
+
+def _prefixes_from_paths(paths: list[str]) -> tuple[str, ...]:
+    return tuple(path.removesuffix("**") for path in paths)

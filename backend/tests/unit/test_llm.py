@@ -4,7 +4,13 @@ import pytest
 from pydantic import ValidationError
 
 from pr_gate.application.models import AnalysisOutput, AnalysisPrompt, FixOutput, FixPrompt
-from pr_gate.infrastructure.llm import FakeLLMGateway, LLMError, OpenAILLMGateway
+from pr_gate.infrastructure.config import ModelProfile
+from pr_gate.infrastructure.llm import (
+    FakeLLMGateway,
+    GeminiLLMGateway,
+    LLMError,
+    OpenAILLMGateway,
+)
 
 
 def test_output_rejects_unknown_fields() -> None:
@@ -52,6 +58,51 @@ async def test_openai_gateway_uses_sdk_pydantic_parse(monkeypatch: pytest.Monkey
     assert gateway.usage is not None
     assert gateway.usage.input_tokens == 12
     assert gateway.usage.output_tokens == 4
+
+
+@pytest.mark.asyncio
+async def test_gemini_gateway_uses_openai_compatible_chat_api(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: dict[str, object] = {}
+    output = AnalysisOutput(summary="ok", findings=[])
+
+    class ChatCompletions:
+        async def create(self, **kwargs: object) -> object:
+            calls.update(kwargs)
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(content='{"summary":"ok","findings":[]}')
+                    )
+                ],
+                usage=SimpleNamespace(prompt_tokens=8, completion_tokens=5),
+            )
+
+    client = SimpleNamespace(chat=SimpleNamespace(completions=ChatCompletions()))
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    monkeypatch.setattr("pr_gate.infrastructure.llm.AsyncOpenAI", lambda **kwargs: client)
+
+    profile = ModelProfile(
+        id="gemini-small",
+        provider="gemini",
+        model="gemini-2.0-flash",
+        api_key_env="GEMINI_API_KEY",
+        temperature=0,
+        timeout_seconds=60,
+        max_retries=2,
+        enabled=True,
+    )
+    gateway = GeminiLLMGateway(profile)
+
+    assert await gateway.analyze("safe context") == output
+    assert calls["model"] == "gemini-2.0-flash"
+    assert calls["temperature"] == 0
+    assert calls["messages"][0]["role"] == "user"
+    assert "untrusted_context" in calls["messages"][0]["content"]
+    assert gateway.usage is not None
+    assert gateway.usage.input_tokens == 8
+    assert gateway.usage.output_tokens == 5
 
 
 @pytest.mark.asyncio

@@ -3,8 +3,12 @@ validation_profiles:
     allowed_paths:
       - app/**
       - tests/**
+    allowed_source_paths:
+      - app/**
+    allowed_test_paths:
+      - tests/**
     test_command: ["python", "-m", "pytest", "-q"]
-    regression_test_command: ["python", "-m", "pytest", "-q"]
+    regression_test_command: ["python", "-m", "pytest", "-vv"]
     lint_command: ["ruff", "check", "."]
     timeout_seconds: 120
     network_enabled: false

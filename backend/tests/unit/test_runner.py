@@ -3,7 +3,11 @@ from pathlib import Path
 import pytest
 
 from pr_gate.infrastructure import runner
-from pr_gate.infrastructure.runner import DockerRunner, classify_command_result
+from pr_gate.infrastructure.runner import (
+    DockerRunner,
+    classify_command_result,
+    extract_pytest_tests,
+)
 from pr_gate.infrastructure.workspaces import WorkspaceError, WorkspaceManager
 
 
@@ -14,6 +18,19 @@ def test_classifies_functional_failure_separately_from_infrastructure() -> None:
         == "INFRASTRUCTURE_ERROR"
     )
     assert classify_command_result(1, "", "ModuleNotFoundError: x") == "IMPORT_ERROR"
+
+
+def test_extracts_pytest_executed_and_failed_tests() -> None:
+    output = """
+tests/test_orders.py::test_catalog_price FAILED                         [ 50%]
+tests/test_orders.py::test_other PASSED                                  [100%]
+FAILED tests/test_orders.py::test_catalog_price - AssertionError
+"""
+
+    tests = extract_pytest_tests(output, "")
+
+    assert tests["executed_tests"] == ("test_catalog_price", "test_other")
+    assert tests["failed_tests"] == ("test_catalog_price",)
 
 
 @pytest.mark.asyncio

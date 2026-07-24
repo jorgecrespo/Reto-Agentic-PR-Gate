@@ -25,6 +25,20 @@ def test_rejects_invalid_pull_request_url() -> None:
     assert response.headers["content-type"].startswith("application/problem+json")
 
 
+def test_rejects_analysis_without_required_acceptance_criteria() -> None:
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/analyses",
+            json={
+                "pull_request_url": "https://github.com/acme/shop/pull/1",
+                "model_profile_id": "openai-small",
+                "validation_profile_id": "python-demo",
+                "acceptance_criteria": [],
+            },
+        )
+    assert response.status_code == 422
+
+
 def test_exposes_only_safe_configuration() -> None:
     with TestClient(app) as client:
         models = client.get("/api/v1/config/models").json()
@@ -32,6 +46,8 @@ def test_exposes_only_safe_configuration() -> None:
         policy = client.get("/api/v1/config/policy").json()
     assert models["models"]
     assert "api_key_env" not in models["models"][0]
+    assert models["models"][0]["id"] == "gemini-small"
+    assert {item["id"] for item in models["models"]} == {"gemini-small", "openai-small"}
     assert profiles == {"validation_profiles": [{"id": "python-demo"}]}
     assert policy["version"] == "1.0.1"
 

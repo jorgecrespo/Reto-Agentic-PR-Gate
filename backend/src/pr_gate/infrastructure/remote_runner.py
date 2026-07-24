@@ -7,6 +7,8 @@ from typing import Any
 
 import httpx
 
+from pr_gate.infrastructure.runner import classify_command_result, extract_pytest_tests
+
 
 class RemoteRunner:
     def __init__(self, executor_url: str, profile_id: str) -> None:
@@ -36,13 +38,25 @@ class RemoteRunner:
                 "timed_out": False,
                 "infrastructure_error": True,
             }
+        exit_code = payload.get("exit_code")
+        parsed_exit_code = exit_code if isinstance(exit_code, int) else None
+        stdout = str(payload.get("stdout", ""))
+        stderr = str(payload.get("stderr", ""))
+        infrastructure_error = bool(payload.get("infrastructure_error", False))
+        tests = extract_pytest_tests(stdout, stderr)
         return {
             "command_name": str(payload.get("command_name", phase)),
-            "exit_code": payload.get("exit_code"),
-            "stdout": str(payload.get("stdout", "")),
-            "stderr": str(payload.get("stderr", "")),
+            "command": payload.get("command") if isinstance(payload.get("command"), list) else [],
+            "exit_code": parsed_exit_code,
+            "stdout": stdout,
+            "stderr": stderr,
             "timed_out": bool(payload.get("timed_out", False)),
-            "infrastructure_error": bool(payload.get("infrastructure_error", False)),
+            "infrastructure_error": infrastructure_error,
+            "classification": classify_command_result(
+                parsed_exit_code, stdout, stderr, infrastructure_error
+            ),
+            "executed_tests": list(tests["executed_tests"]),
+            "failed_tests": list(tests["failed_tests"]),
         }
 
     @staticmethod

@@ -93,22 +93,31 @@ async def _run_analysis(analysis_id: str, request: CreateAnalysisInput) -> None:
         model_profile = _model_profile(request.model_profile_id)
         if model_profile is None:
             raise ValueError("El perfil de modelo seleccionado no está disponible.")
-        graph = build_graph(build_runtime_dependencies(STORE, profile, model_profile))
-        await graph.ainvoke(
-            {
-                "analysis_id": analysis_id,
-                "request": {
-                    "pull_request_url": request.pull_request_url,
-                    "model_profile_id": request.model_profile_id,
-                    "validation_profile_id": request.validation_profile_id,
-                    "acceptance_criteria": [
-                        item.model_dump() for item in request.acceptance_criteria
-                    ],
-                },
-            }
-        )
+        dependencies = build_runtime_dependencies(STORE, profile, model_profile)
+        graph = build_graph(dependencies)
+        try:
+            await graph.ainvoke(
+                {
+                    "analysis_id": analysis_id,
+                    "request": {
+                        "pull_request_url": request.pull_request_url,
+                        "model_profile_id": request.model_profile_id,
+                        "validation_profile_id": request.validation_profile_id,
+                        "acceptance_criteria": [
+                            item.model_dump() for item in request.acceptance_criteria
+                        ],
+                    },
+                }
+            )
+        finally:
+            await dependencies.workspaces.cleanup(None, None)
     except (ValueError, GitHubError) as error:
-        STORE.finish(analysis_id, "INCONCLUSIVE", {}, str(error))
+        STORE.finish(
+            analysis_id,
+            "INCONCLUSIVE",
+            _inconclusive_report(analysis_id, request, str(error)),
+            str(error),
+        )
         STORE.add_event(
             analysis_id, 9999, "finalize", "Análisis finalizado sin evidencia suficiente."
         )
@@ -116,10 +125,48 @@ async def _run_analysis(analysis_id: str, request: CreateAnalysisInput) -> None:
         STORE.finish(
             analysis_id,
             "INCONCLUSIVE",
-            {},
+            _inconclusive_report(
+                analysis_id, request, f"Error interno de análisis: {type(error).__name__}"
+            ),
             f"Error interno de análisis: {type(error).__name__}",
         )
         STORE.add_event(analysis_id, 9999, "finalize", "Análisis finalizado por un error interno.")
+
+
+def _inconclusive_report(
+    analysis_id: str, request: CreateAnalysisInput, message: str
+) -> dict[str, object]:
+    return {
+        "analysis_id": analysis_id,
+        "decision": {
+            "status": "INCONCLUSIVE",
+            "summary": "El análisis no produjo evidencia suficiente.",
+            "policy_version": "unknown",
+            "rules": [],
+            "blocking_reasons": [],
+            "warnings": [],
+            "not_evaluated_rules": [],
+            "required_actions": ["Corregir la causa del fallo y ejecutar un nuevo análisis."],
+        },
+        "pull_request": {"url": request.pull_request_url, "modified_files": []},
+        "acceptance_criteria": [
+            {
+                **item.model_dump(),
+                "status": "NOT_EVALUATED",
+                "evidence": [],
+                "source": "NOT_EXECUTED",
+                "reason": message,
+            }
+            for item in request.acceptance_criteria
+        ],
+        "execution": {
+            "llm": {"status": "NOT_EXECUTED", "reason": message},
+            "candidate_validation": {"status": "NOT_EXECUTED", "reason": message},
+            "not_executed_controls": [],
+        },
+        "errors": [{"code": "ANALYSIS_INCONCLUSIVE", "message": message}],
+        "finalized": True,
+    }
 
 
 @asynccontextmanager

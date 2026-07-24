@@ -95,16 +95,15 @@ class PullRequestRef:
 class GateFacts:
     head_sha_current: bool | None
     context_complete: bool | None
+    analysis_completed: bool | None
     tests_executed: bool | None
     tests_passed: bool | None
+    lint_executed: bool | None
+    lint_passed: bool | None
     critical_findings: int
     secrets_detected: bool | None
     required_criteria_evaluated: bool | None
     required_criteria_passed: bool | None
-    patch_applied: bool | None
-    regression_reproduced: bool | None
-    regression_fixed: bool | None
-    suite_passed: bool | None
     business_logic_changed: bool
     tests_changed: bool
     pr_is_draft: bool

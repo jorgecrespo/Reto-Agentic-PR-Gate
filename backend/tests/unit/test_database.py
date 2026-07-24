@@ -6,6 +6,7 @@ from sqlalchemy import inspect, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from pr_gate.application.report import AnalysisReport
 from pr_gate.graph.runtime import RuntimeRepository
 from pr_gate.infrastructure.database import AnalysisStore, ValidationRecord
 from pr_gate.infrastructure.runner import CommandResult
@@ -141,7 +142,7 @@ async def test_persists_actionable_report_without_secret_value(tmp_path: Path) -
         },
     }
 
-    await RuntimeRepository(store).persist(state)  # type: ignore[arg-type]
+    await RuntimeRepository(store).persist(AnalysisReport.from_state(state))
 
     saved = store.get(analysis.id)
     assert saved is not None

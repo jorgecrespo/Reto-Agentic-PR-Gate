@@ -28,9 +28,17 @@ def evaluate_quality_gate(facts: GateFacts, policy_version: str = "1.0.1") -> Ga
             facts, "GATE-002", facts.context_complete, "El contexto mínimo debe estar disponible."
         ),
         _result(
+            facts,
+            "GATE-016",
+            facts.analysis_completed,
+            "El análisis obligatorio debe completarse.",
+        ),
+        _result(
             facts, "GATE-003", facts.tests_executed, "Los tests obligatorios deben ejecutarse."
         ),
         _result(facts, "GATE-004", facts.tests_passed, "Los tests obligatorios deben aprobar."),
+        _result(facts, "GATE-017", facts.lint_executed, "El lint configurado debe ejecutarse."),
+        _result(facts, "GATE-018", facts.lint_passed, "El lint configurado debe aprobar."),
         _result(
             facts, "GATE-005", facts.critical_findings == 0, "No debe haber hallazgos críticos."
         ),
@@ -52,12 +60,6 @@ def evaluate_quality_gate(facts: GateFacts, policy_version: str = "1.0.1") -> Ga
             facts.required_criteria_passed,
             "Los criterios obligatorios deben aprobar.",
         ),
-        _result(facts, "GATE-009", facts.patch_applied, "El parche debe aplicarse."),
-        _result(
-            facts, "GATE-010", facts.regression_reproduced, "El test debe reproducir el defecto."
-        ),
-        _result(facts, "GATE-011", facts.regression_fixed, "El test debe aprobar con el parche."),
-        _result(facts, "GATE-012", facts.suite_passed, "La suite candidate debe aprobar."),
         _result(
             facts,
             "GATE-013",
@@ -69,30 +71,37 @@ def evaluate_quality_gate(facts: GateFacts, policy_version: str = "1.0.1") -> Ga
             facts, "GATE-015", facts.no_newer_pr, "No debe existir una revisión más nueva del PR."
         ),
     )
-    inconclusive_failure_rules = {"GATE-001", "GATE-002", "GATE-003", "GATE-007", "GATE-015"}
-    # The PR-to-QA decision uses evidence from the current PR. Candidate-patch
-    # rules remain reportable validation evidence and never approve this PR.
-    mandatory_unknown = any(rule.outcome is RuleOutcome.UNKNOWN for rule in rules[:8])
+    inconclusive_failure_rules = {
+        "GATE-001",
+        "GATE-002",
+        "GATE-003",
+        "GATE-007",
+        "GATE-015",
+        "GATE-016",
+        "GATE-017",
+    }
+    # The PR-to-QA decision uses evidence from the current PR only.
+    mandatory_unknown = any(rule.outcome is RuleOutcome.UNKNOWN for rule in rules[:11])
     mandatory_fail = any(
         rule.outcome is RuleOutcome.FAIL and rule.rule_id not in inconclusive_failure_rules
-        for rule in rules[:8]
+        for rule in rules[:11]
     )
-    secret_failure = rules[5].outcome is RuleOutcome.FAIL
-    conditional_fail = any(rule.outcome is RuleOutcome.FAIL for rule in rules[12:14])
+    secret_failure = rules[8].outcome is RuleOutcome.FAIL
+    conditional_fail = any(rule.outcome is RuleOutcome.FAIL for rule in rules[11:13])
     inconclusive_fail = any(
         rule.outcome is RuleOutcome.FAIL and rule.rule_id in inconclusive_failure_rules
         for rule in rules
     )
-    newer_revision_unknown = rules[14].outcome is RuleOutcome.UNKNOWN
+    newer_revision_unknown = rules[13].outcome is RuleOutcome.UNKNOWN
     if secret_failure:
         status, summary = DecisionStatus.BLOCKED, "Se detectó un secreto potencial en el cambio."
+    elif mandatory_fail:
+        status, summary = DecisionStatus.BLOCKED, "El cambio incumple controles bloqueantes."
     elif mandatory_unknown or inconclusive_fail or newer_revision_unknown:
         status, summary = (
             DecisionStatus.INCONCLUSIVE,
             "Falta evidencia para evaluar controles obligatorios.",
         )
-    elif mandatory_fail:
-        status, summary = DecisionStatus.BLOCKED, "El cambio incumple controles bloqueantes."
     elif conditional_fail:
         status, summary = (
             DecisionStatus.CONDITIONAL,

@@ -46,7 +46,7 @@ Para cada tarea:
 6. Ejecutar los controles relevantes.
 7. Corregir fallos antes de continuar.
 8. Actualizar `tasks.md` solamente cuando la tarea cumpla su definición de terminado.
-9. Registrar decisiones no triviales en `docs/decisions/`.
+9. Registrar decisiones no triviales en el README.
 
 No instalar dependencias ni modificar configuración global sin comprobar antes que sean necesarias.
 
@@ -480,17 +480,16 @@ No marcar una tarea como terminada si:
 
 ## 16. Documentación
 
-Mantener:
+El README es el documento único del proyecto. Mantener en él:
 
-- README con instalación y demo;
-- arquitectura;
-- política del gate;
-- modelo de seguridad;
+- requisitos, incluido Docker corriendo;
+- arranque con un solo comando Docker e instalación para desarrollo;
+- uso, claves opcionales y reset de la base para demo;
+- resumen de arquitectura, modelo de seguridad y política del gate;
 - variables de entorno;
-- guía para agregar proveedores;
-- limitaciones;
-- documento de decisiones del reto;
-- atribución transparente del uso de IA.
+- guía breve para agregar proveedores;
+- troubleshooting y limitaciones;
+- guía de demo en `scripts/create_demo_prs.md`.
 
 Toda afirmación de performance, costo o cobertura debe provenir de una medición.
 

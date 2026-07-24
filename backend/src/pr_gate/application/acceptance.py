@@ -10,6 +10,7 @@ class AcceptanceCriterion:
     id: str
     text: str
     required: bool
+    validation_tests: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -24,22 +25,36 @@ class AcceptanceEvaluation:
 def evaluate_acceptance_criteria(
     criteria: tuple[AcceptanceCriterion, ...],
     suite_passed: bool | None,
-    evidence_ids: tuple[str, ...],
+    executed_tests: tuple[str, ...],
+    failed_tests: tuple[str, ...],
 ) -> tuple[AcceptanceEvaluation, ...]:
-    """Tests establish only that explicitly supplied criteria were evaluated by validation."""
-    status = (
-        AcceptanceStatus.PASSED
-        if suite_passed is True
-        else AcceptanceStatus.FAILED
-        if suite_passed is False
-        else AcceptanceStatus.NOT_EVALUATED
-    )
-    return tuple(
-        AcceptanceEvaluation(
-            criterion.id,
-            status,
-            evidence_ids if status is not AcceptanceStatus.NOT_EVALUATED else (),
-            "validation",
+    """Criteria pass only when their configured tests ran and did not fail."""
+    executed = set(executed_tests)
+    failed = set(failed_tests)
+    results: list[AcceptanceEvaluation] = []
+    for criterion in criteria:
+        expected = set(criterion.validation_tests)
+        if not expected or not expected.issubset(executed) or suite_passed is None:
+            results.append(
+                AcceptanceEvaluation(
+                    criterion.id,
+                    AcceptanceStatus.NOT_EVALUATED,
+                    (),
+                    "validation",
+                )
+            )
+            continue
+        status = (
+            AcceptanceStatus.FAILED
+            if expected & failed or suite_passed is False
+            else AcceptanceStatus.PASSED
         )
-        for criterion in criteria
-    )
+        results.append(
+            AcceptanceEvaluation(
+                criterion.id,
+                status,
+                tuple(f"test:{test}" for test in sorted(expected)),
+                "validation",
+            )
+        )
+    return tuple(results)

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Self
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class StrictModel(BaseModel):
@@ -11,13 +13,23 @@ class AcceptanceCriterionInput(StrictModel):
     id: str = Field(pattern=r"^[A-Za-z0-9_-]+$")
     text: str = Field(min_length=1, max_length=1000)
     required: bool = True
+    validation_tests: list[str] = Field(default_factory=list, max_length=20)
 
 
 class CreateAnalysisInput(StrictModel):
     pull_request_url: str
     model_profile_id: str
     validation_profile_id: str
-    acceptance_criteria: list[AcceptanceCriterionInput] = Field(default_factory=list, max_length=20)
+    acceptance_criteria: list[AcceptanceCriterionInput] = Field(min_length=1, max_length=20)
+
+    @model_validator(mode="after")
+    def require_verifiable_required_criteria(self) -> Self:
+        required = [item for item in self.acceptance_criteria if item.required]
+        if not required:
+            raise ValueError("Debe existir al menos un criterio de aceptación obligatorio.")
+        if any(not item.validation_tests for item in required):
+            raise ValueError("Cada criterio obligatorio debe declarar al menos un validation_test.")
+        return self
 
 
 class FindingOutput(StrictModel):
@@ -44,6 +56,7 @@ class FixOutput(StrictModel):
     summary: str
     patch: str
     regression_test_patch: str
+    regression_test_name: str | None = Field(default=None, pattern=r"^[A-Za-z_][A-Za-z0-9_]*$")
     modified_paths: list[str] = Field(min_length=1)
     assumptions: list[str] = Field(default_factory=list)
 

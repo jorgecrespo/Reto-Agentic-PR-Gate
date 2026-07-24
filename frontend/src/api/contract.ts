@@ -4,7 +4,7 @@ export type RuleOutcome = "PASS" | "FAIL" | "UNKNOWN";
 
 export interface ModelProfile { id: string; provider: string; model: string; enabled: boolean }
 export interface ValidationProfile { id: string }
-export interface AcceptanceCriterion { id: string; text: string; required: boolean }
+export interface AcceptanceCriterion { id: string; text: string; required: boolean; validation_tests?: string[] }
 export interface CreateAnalysisRequest {
   pull_request_url: string;
   model_profile_id: string;
@@ -18,8 +18,8 @@ export interface Finding {
   title: string; category: string; severity: string; file_path: string; start_line: number; end_line: number;
   evidence_excerpt: string; explanation: string; impact: string; recommended_action: string; confidence: number;
 }
-export interface Fix { summary: string; patch: string; regression_test_patch: string; modified_paths: string[]; assumptions: string[] }
-export interface ValidationResult { command_name?: string; exit_code?: number | null; stdout?: string; stderr?: string; timed_out?: boolean; infrastructure_error?: boolean }
+export interface Fix { summary: string; patch: string; regression_test_patch: string; regression_test_name?: string | null; modified_paths: string[]; assumptions: string[] }
+export interface ValidationResult { command_name?: string; command?: string[]; exit_code?: number | null; stdout?: string; stderr?: string; timed_out?: boolean; infrastructure_error?: boolean; classification?: string; executed_tests?: string[]; failed_tests?: string[] }
 export interface CriterionResult { id: string; text: string; required: boolean; status: string; evidence: string[]; reason?: string }
 export interface PullRequestSummary { url?: string | null; title?: string | null; base_sha?: string | null; head_sha?: string | null; draft?: boolean | null; modified_files: string[] }
 export interface SecretEvidence { path: string; start_line: number; end_line: number; kinds: string[] }
@@ -28,7 +28,7 @@ export interface ExecutionSummary { llm?: { status: "EXECUTED" | "NOT_EXECUTED";
 export interface Decision { status: DecisionStatus; summary: string; policy_version: string; rules: Rule[]; blocking_reasons?: Rule[]; warnings?: Rule[]; not_evaluated_rules?: Rule[]; required_actions?: string[] }
 export interface AnalysisReport {
   analysis_id?: string; head_sha?: string | null; decision?: Decision; findings?: { summary?: string; findings?: Finding[] };
-  fix?: Fix | null; validations?: { original?: { results?: ValidationResult[]; suite_passed?: boolean | null }; baseline?: { result?: ValidationResult; reproduced?: boolean | null }; candidate?: { status?: "VALIDATED" | "FAILED" | "NOT_PROPOSED"; results?: ValidationResult[]; regression_fixed?: boolean | null; suite_passed?: boolean | null } };
+  fix?: Fix | null; validations?: { original?: { results?: ValidationResult[]; tests_passed?: boolean | null; lint_passed?: boolean | null }; baseline?: { result?: ValidationResult; reproduced?: boolean | null; target_test?: string | null }; candidate?: { status?: "VALIDATED" | "REJECTED" | "INCONCLUSIVE" | "NOT_PROPOSED"; results?: ValidationResult[]; target_test?: string | null; target_test_executed?: boolean | null; regression_fixed?: boolean | null; tests_passed?: boolean | null; lint_passed?: boolean | null } };
   pull_request?: PullRequestSummary; acceptance_criteria?: CriterionResult[]; secret_evidence?: SecretEvidence[]; execution?: ExecutionSummary; errors?: { code: string; message: string }[]; limitations?: string[];
 }
 export interface Analysis { id: string; status: DecisionStatus; report: AnalysisReport; error: string | null; created_at: string; finished_at: string | null; duration_ms: number | null; input_tokens: number | null; output_tokens: number | null; estimated_cost: number | null; model_profile_id: string; validation_profile_id: string }

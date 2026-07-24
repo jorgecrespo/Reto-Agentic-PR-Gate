@@ -83,7 +83,7 @@ async def _execute(archive: Path, phase: str, profile_id: str) -> dict[str, Any]
     try:
         code, _, stderr, timed_out = await _run("docker", "volume", "create", volume)
         if code != 0 or timed_out:
-            return _result(phase, None, "", stderr, timed_out, True)
+            return _result(phase, None, "", stderr, timed_out, True, command)
         created_volume = True
         extract_program = (
             "from pathlib import Path; import shutil, zipfile; "
@@ -108,15 +108,15 @@ async def _execute(archive: Path, phase: str, profile_id: str) -> dict[str, Any]
             extract_program,
         )
         if code != 0 or timed_out:
-            return _result(phase, None, "", stderr, timed_out, True)
+            return _result(phase, None, "", stderr, timed_out, True, command)
         code, _, stderr, timed_out = await _run(
             "docker", "cp", str(archive), f"{staging}:/tmp/source.zip"
         )
         if code != 0 or timed_out:
-            return _result(phase, None, "", stderr, timed_out, True)
+            return _result(phase, None, "", stderr, timed_out, True, command)
         code, _, stderr, timed_out = await _run("docker", "start", "-a", staging)
         if code != 0 or timed_out:
-            return _result(phase, None, "", stderr, timed_out, True)
+            return _result(phase, None, "", stderr, timed_out, True, command)
         code, stdout, stderr, timed_out = await _run(
             "docker",
             "run",
@@ -144,7 +144,7 @@ async def _execute(archive: Path, phase: str, profile_id: str) -> dict[str, Any]
             *command,
             timeout_seconds=timeout,
         )
-        return _result(phase, code, stdout, stderr, timed_out, code is None)
+        return _result(phase, code, stdout, stderr, timed_out, code is None, command)
     finally:
         await _run("docker", "rm", "-f", staging)
         if created_volume:
@@ -158,9 +158,11 @@ def _result(
     stderr: str,
     timed_out: bool,
     infrastructure_error: bool,
+    command: tuple[str, ...] | None = None,
 ) -> dict[str, Any]:
     return {
         "command_name": phase,
+        "command": list(command or ()),
         "exit_code": exit_code,
         "stdout": stdout,
         "stderr": stderr,
